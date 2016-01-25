@@ -15,7 +15,7 @@
   <li><a href="/home/games.html">Games</a></li>
   <li><a class="active" href="#register">Register</a></li>
   <li><a href="/home/login.html">Login</a></li>
-  <li><a href="/home/logout.html">Logout</a></li>
+  <li style="float: right;"><a href="/home/index.html">Logout</a></li>
   <h3></h3>
 </ul>
 
@@ -33,7 +33,7 @@
             <p><label class="field" for="password">Password:</label>
                 <input id="password_field" type="password" name="password" class="textbox-300" /></p>
     </fieldset>
-    <p><input type="button" id="submit" value="Register"></p>
+    <p><input type="button" class="submit" id="submit" value="Register"></p>
 </form>
 
 <h2></h2>
@@ -50,6 +50,11 @@ $.post( "http://lucx.info/session.php", function(response)
 
 var socket = io.connect();
 
+socket.on('register_result', function(data)
+{
+    $("h2").html(data.message);
+});
+
 $('#submit').click(function()
 {
     var firstname_field = document.getElementById("firstname_field").value;
@@ -58,13 +63,9 @@ $('#submit').click(function()
     var username_field = document.getElementById("username_field").value;
     var password_field = document.getElementById("password_field").value;
 
-    socket.emit('register_data', {'firstname':firstname_field, 'lastname':lastname_field, 'email':email_field, 'username':username_field, 'password':password_field});
-    /*
-    $.post( "http://lucx.info/register.php", { name: name_field, email: email_field, username: username_field, password: password_field }, function(response)
-    {
-        $("h2").html(response);
-    });
-    */
+    socket.emit('register_data', {'firstname':firstname_field, 
+        'lastname':lastname_field, 'email':email_field, 
+        'username':username_field, 'password':password_field});
 });
 
 </script>

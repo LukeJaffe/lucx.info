@@ -26,6 +26,7 @@ input.textbox-300
 {
     width: 300px;
     float: left;
+    background-color: LIGHT1;
 }
 
 fieldset p
@@ -89,6 +90,23 @@ fieldset p
     background-color: DARK1;
 }
 
+.submit
+{
+    display: block;
+    padding: 0 10px;
+    background-color: DARK3;
+    color: LIGHT1;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 100%;
+    padding: 1px;
+    width: 150px;
+    box-shadow: 0 0 5px DARK3;
+    border-bottom-left-radius:1em;
+    border-bottom-right-radius:1em;
+    border-top-left-radius:1em;
+    border-top-right-radius:1em;
+}
+
 h1
 {
     color: DARK3;
@@ -100,9 +118,9 @@ h1
 h2
 {
     position: fixed;
-    top: 250px;
+    top: 300px;
     left: 50px;
-    color: red;
+    color: yellow;
     text-align: center;
     font-family: "Calibri";
     font-size: large;

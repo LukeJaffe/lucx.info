@@ -19,7 +19,7 @@ module.exports =
             }   
         }, 
 
-        AUTHENTICATE:
+        LOGIN:
         {
             ERROR:
             {

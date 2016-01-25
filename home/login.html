@@ -14,14 +14,19 @@
   <li><a href="/home/games.html">Games</a></li>
   <li><a href="/home/register.html">Register</a></li>
   <li><a class="active" href="#login">Login</a></li>
-  <li><a href="/home/logout.html">Logout</a></li>
+  <li style="float: right;"><a href="/home/index.html">Logout</a></li>
   <h3></h3>
 </ul>
 
-<form action="login.php" method="post" style="margin: 10px;">
-    Username: <input id="username_field" type="text" name="name"><br>
-    Password: <input id="password_field" type="password" name="email"><br>
-    <input type="button" id="submit" value="login">
+<form method="post" action="register.php" style="margin: 10px;">
+    <fieldset>
+        <Legend>Account Login</legend>
+            <p><label class="field" for="username">Username:</label>
+                <input id="username_field" type="text" name="username" class="textbox-300" /></p>
+            <p><label class="field" for="password">Password:</label>
+                <input id="password_field" type="password" name="password" class="textbox-300" /></p>
+    </fieldset>
+    <p><input type="button" class="submit" id="submit" value="Login"></p>
 </form>
 
 <h2></h2>
@@ -48,15 +53,6 @@ $('#submit').click(function()
     var password_field = document.getElementById("password_field").value;
 
     socket.emit('login_data', {'username':username_field, 'password':password_field});
-    /*
-    $.post( "http://lucx.info/login.php", { username: username_field, password: password_field }, function(response)
-    {
-        if (response == 1)
-            $("h2").html("Login failure.");
-        else
-            $("h3").html("Welcome: "+response);
-    });
-    */
 });
 
 /*
