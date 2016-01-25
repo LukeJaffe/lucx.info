@@ -1,0 +1,178 @@
+<html>
+
+<head>
+
+<script src="jquery-1.11.3.min.js"></script>
+
+<style>
+
+table, th, td {
+    border: 1px solid black;
+}
+
+h1
+{
+    color: black;
+    text-align: center;
+    font-family: "Calibri";
+    font-size: xx-large;
+}
+
+h2
+{
+    position: fixed;
+    top: 250px;
+    left: 50px;
+    color: red;
+    text-align: center;
+    font-family: "Calibri";
+    font-size: large;
+}
+
+Red {background-color: red;}
+Blue {background-color: blue;}
+Orange {background-color: orange;}
+White {background-color: white;}
+
+</style>
+</head>
+
+<body>
+
+<h1>Game Setup</h1>
+
+<table id="setup_table" border="1" cellpadding="5" cellspacing="5">
+</table>
+
+<button id="start_button">Start Game</button>
+
+<h2></h2>
+
+<script>
+
+/* Disable the start game button */
+$("#start_button").prop("disabled", true);
+
+/* Redirect to game page if game is started (every 1s)*/
+function goto_game()
+{
+    $.post("http://lucx.info/catan/check_started.php",
+    function(response)
+    {
+        if (response == 1)
+        {
+            window.location.href = "http://lucx.info/catan/game.html";
+            $("h2").html("started");
+        }
+        else if (response == 0) 
+            $("h2").html("not started");
+        else
+            $("h2").html("fail code");
+    });
+}
+
+setInterval(goto_game, 1000);
+
+/* Fetch entries from mysql */
+$.post("http://lucx.info/catan/get_players.php",
+function(response)
+{
+    /* Add column titles to table */
+    var table = document.getElementById("setup_table");
+    var row = table.insertRow(0);
+    var cell1 = row.insertCell(0);
+    var cell2 = row.insertCell(1);
+    cell1.innerHTML = "<th><b>Player</b></th>";
+    cell2.innerHTML = "<th><b>Color</b></th>";
+
+    /* Parse response */
+    var result = $.parseJSON(response);
+
+    /* Get available colors */
+    var colors = ["Red", "Blue", "Orange", "White"];
+    for (var i = 0; i < result.length-1; i++)
+    {
+        colors = $.grep(colors, function(value)
+        {
+            return value != result[i][1];
+        });
+    }
+
+    /* Draw html elements */
+    for (var i = 0; i < result.length-1; i++)
+    {
+        var row = table.insertRow(1);
+        var cell1 = row.insertCell(0);
+        var cell2 = row.insertCell(1);
+        cell1.innerHTML = "<td>"+result[i][0]+"</td>";
+        if (result[result.length-1][0] == result[i][0] && result[i][1] == "")
+        {
+            
+            var str = 
+            "<select id='color_select'>"+
+                "<option value='None'>None</option>";
+            for (var j = 0; j < colors.length; j++)
+                str += 
+                "<option value='"+colors[j]+"'>"+colors[j]+"</option>";
+            str += 
+            "</select>";
+            cell2.innerHTML = str;
+            /* Color index changed */
+            $('#color_select').change( function()
+            {
+                var option = $(this).find('option:selected').val();
+                $.post("http://lucx.info/catan/select_color.php",
+                {color: option},
+                function(response)
+                {
+                    if (response == 0)
+                        location.reload();
+                    else
+                        $("h2").html(response);
+                });
+            });
+        }
+        else
+        {
+            var c = result[i][1];
+            cell2.innerHTML = "<"+c+">_____</"+c+">";
+        }
+    }
+});
+
+/* Check if game is full */
+var full = false;
+$.post("http://lucx.info/catan/check_full.php",
+function(response)
+{
+    if (response == 0)
+        full = false;
+    else if (response == 1)
+        full = true;
+    else
+        $("h2").html(response);
+});
+
+/* Enable start button if host and full */
+$.post("http://lucx.info/catan/check_host.php",
+function(response)
+{
+    if (response == 0 && full == true)
+        $("#start_button").prop("disabled", false);
+});
+
+/* Start button starts game */
+$("#start_button").click(function()
+{
+    $.post("http://lucx.info/catan/start_game.php",
+    function(response)
+    {
+    });
+    window.location.href = "http://lucx.info/catan/game.html";
+});
+
+</script>
+
+</body>
+
+<html>

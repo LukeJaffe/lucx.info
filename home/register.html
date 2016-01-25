@@ -1,0 +1,73 @@
+<html>
+
+<head>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/utils/jquery-1.11.3.min.js"></script>
+<link rel="stylesheet" type="text/css" href="/home/pp_home.css"
+
+</head>
+
+<body>
+
+<ul class="horizontal-list">
+  <li><a href="/home/index.html">Home</a></li>
+  <li><a href="/home/games.html">Games</a></li>
+  <li><a class="active" href="#register">Register</a></li>
+  <li><a href="/home/login.html">Login</a></li>
+  <li><a href="/home/logout.html">Logout</a></li>
+  <h3></h3>
+</ul>
+
+<form method="post" action="register.php" style="margin: 10px;">
+    <fieldset>
+        <Legend>Account Registration</legend>
+            <p><label class="field" for="firstname">First Name:</label>
+                <input id="firstname_field" type="text" name="firstname" class="textbox-300" /></p>
+            <p><label class="field" for="lastname">Last Name:</label>
+                <input id="lastname_field" type="text" name="lastname" class="textbox-300" /></p>
+            <p><label class="field" for="email">Email:</label>
+                <input id="email_field" type="text" name="email" class="textbox-300" /></p>
+            <p><label class="field" for="username">Username:</label>
+                <input id="username_field" type="text" name="username" class="textbox-300" /></p>
+            <p><label class="field" for="password">Password:</label>
+                <input id="password_field" type="password" name="password" class="textbox-300" /></p>
+    </fieldset>
+    <p><input type="button" id="submit" value="Register"></p>
+</form>
+
+<h2></h2>
+
+<script>
+
+
+/*
+$.post( "http://lucx.info/session.php", function(response)
+{
+    $("h3").html("Welcome: "+response);
+});
+*/
+
+var socket = io.connect();
+
+$('#submit').click(function()
+{
+    var firstname_field = document.getElementById("firstname_field").value;
+    var lastname_field = document.getElementById("lastname_field").value;
+    var email_field = document.getElementById("email_field").value;
+    var username_field = document.getElementById("username_field").value;
+    var password_field = document.getElementById("password_field").value;
+
+    socket.emit('register_data', {'firstname':firstname_field, 'lastname':lastname_field, 'email':email_field, 'username':username_field, 'password':password_field});
+    /*
+    $.post( "http://lucx.info/register.php", { name: name_field, email: email_field, username: username_field, password: password_field }, function(response)
+    {
+        $("h2").html(response);
+    });
+    */
+});
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,43 @@
+<?php
+    echo "Hello World!\n";
+    $servername = "localhost";
+    $username = "webuser";
+    $password = "password";
+    $dbname = "snake_db";
+
+    if (isset($_GET["p1"])) 
+    {
+        echo 'success\n'
+    }
+
+    // Create connection
+    $conn = new mysqli($servername, $username, $password, $dbname);
+
+    $name = "luke";
+    $score = "100";
+    $sql = "INSERT INTO high_scores (name, score) 
+            VALUES ('" . $name . "', '" . $score . "');";
+
+    if ($conn->query($sql) === TRUE) {
+        echo "WRITE";
+    } else {
+        echo "Error: " . $sql . "<br>" . $conn->error;
+    }
+    
+    $sql = "SELECT * FROM high_scores;";
+    $result = $conn->query($sql);
+    if ($result->num_rows > 0) 
+    {
+        // output data of each row
+        while($row = $result->fetch_assoc()) 
+        {
+            echo $row["name"] . "|" . $row["score"] . "\n";
+        }
+    } 
+    else 
+    {
+        echo "0 results";
+    }
+    // Close connection
+    $conn->close();
+?>

@@ -1,0 +1,75 @@
+<html>
+<body>
+
+<head>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/utils/jquery-1.11.3.min.js"></script>
+<link rel="stylesheet" type="text/css" href="/home/pp_home.css">
+
+</head>
+
+<ul class="horizontal-list">
+  <li><a href="/home/index.html">Home</a></li>
+  <li><a href="/home/games.html">Games</a></li>
+  <li><a href="/home/register.html">Register</a></li>
+  <li><a class="active" href="#login">Login</a></li>
+  <li><a href="/home/logout.html">Logout</a></li>
+  <h3></h3>
+</ul>
+
+<form action="login.php" method="post" style="margin: 10px;">
+    Username: <input id="username_field" type="text" name="name"><br>
+    Password: <input id="password_field" type="password" name="email"><br>
+    <input type="button" id="submit" value="login">
+</form>
+
+<h2></h2>
+
+<script>
+
+/*
+$.post( "http://lucx.info/session.php", function(response)
+{
+    $("h3").html("Welcome: "+response);
+});
+*/
+
+var socket = io.connect();
+
+socket.on('login_result', function(data)
+{
+    $("h2").html(data.message);
+});
+
+$('#submit').click(function()
+{
+    var username_field = document.getElementById("username_field").value;
+    var password_field = document.getElementById("password_field").value;
+
+    socket.emit('login_data', {'username':username_field, 'password':password_field});
+    /*
+    $.post( "http://lucx.info/login.php", { username: username_field, password: password_field }, function(response)
+    {
+        if (response == 1)
+            $("h2").html("Login failure.");
+        else
+            $("h3").html("Welcome: "+response);
+    });
+    */
+});
+
+/*
+$('#logout').click(function()
+{
+    $.post( "http://lucx.info/logout.php", function(response)
+    {
+        $("h3").html("Welcome: "+response);
+    });
+});
+*/
+
+</script>
+
+</body>
+</html>

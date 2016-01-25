@@ -1,0 +1,414 @@
+<html>
+
+<meta http-equiv='cache-control' content='no-cache'>
+<meta http-equiv='expires' content='0'>
+<meta http-equiv='pragma' content='no-cache'>
+
+<head>
+<link rel="stylesheet" type="text/css" href="game.css">
+<style></style>
+
+<!-- Scripts -->
+<script src="jquery-1.11.3.min.js"></script>
+<script src = "seedrandom.js"></script>
+<script src = "utils.js"></script>
+<script src = "message.js"></script>
+<script src = "hextype.js"></script>
+<script src = "hex.js"></script>
+<script src = "road.js"></script>
+<script src = "town.js"></script>
+<script src = "game.js"></script> 
+<script src = "test.js"></script> 
+
+<!-- Top Bar -->
+<ul>
+  <li><a href="http://lucx.info/index.html">Home</a></li>
+  <li><a href="http://lucx.info/catan/index.html">Lobby</a></li>
+  <li><a class="active" href="#game">Game</a></li>
+  <button id="test_a" style="margin: 12px 50px;">Test A</button>
+  <button id="test_b" style="margin: 12px -40px;">Test B</button>
+  <button id="test_c" style="margin: 12px 50px;">Test C</button>
+  <button id="test_d" style="margin: 12px -40px;">Test D</button>
+  <button id="start_game" style="margin: 12px 50px;">Start</button>
+  <h3 id="game_name"></h3>
+  <h3 id="user_name"></h3>
+</ul>
+
+<!-- Game Initialization -->
+<script>
+/* Test Setup */
+Test();
+
+/* Game Setup */
+$(window).on("load", function() 
+{
+    /* Instantiate the game class */
+    game = new Game();
+
+    /* Call most setup ajax */
+    game.ajax();
+
+    /* Wait to get the seed, then setup */
+    $.post("http://lucx.info/catan/get_seed.php",
+    {game: "Game1"},
+    function(response)
+    {
+        game.setup(response);
+    });
+
+    /* Event handling */
+    game.events();
+});
+
+function setup_phase()
+{
+
+}
+
+function begin_turn()
+{
+    console.log("Starting turn");
+    var btn = document.getElementById("phase_button");
+    var text = btn.firstChild;
+    text.data = "Roll";
+    $("#pass_tag").css("color", "black");
+    $("#roll_tag").css("color", "yellow");
+
+    btn.onclick = function()
+    {D6AnimBuilder.get('dice').reset(); D6AnimBuilder.get('dice').start();}
+    /* Enable the phase button */
+    btn.disabled = false; 
+}
+
+function d6_callback(result) 
+{
+    var btn = document.getElementById("phase_button");
+    var text = btn.firstChild;
+    roll_phase(result);
+    trade_phase();
+}
+
+function roll_phase(value)
+{
+    console.log("You rolled a "+value+"!");
+}
+
+function trade_phase()
+{
+    console.log("Starting trade phase...");
+    var btn = document.getElementById("phase_button");
+    btn.onclick = build_phase;
+    var text = btn.firstChild;
+    text.data = "Build";
+    $("#roll_tag").css("color", "black");
+    $("#trade_tag").css("color", "yellow");
+}
+
+function build_phase()
+{
+    console.log("Starting build phase...");
+    var btn = document.getElementById("phase_button");
+    btn.onclick = pass_phase;
+    var text = btn.firstChild;
+    text.data = "Pass";
+    $("#trade_tag").css("color", "black");
+    $("#build_tag").css("color", "yellow");
+}
+
+function pass_phase()
+{
+    console.log("Passing turn");
+    var btn = document.getElementById("phase_button");
+    btn.onclick = begin_turn;
+    var text = btn.firstChild;
+    text.data = "Wait";
+    $("#build_tag").css("color", "black");
+    $("#pass_tag").css("color", "yellow");
+    
+    /* Disable the phase button */
+    btn.disabled = true; 
+
+    /* Get next person in turn order */
+    $.post("http://lucx.info/catan/get_next.php",
+    function(next_player)
+    {
+        console.log("Next:"+next_player);
+        /* Send pass turn message */
+        send_message(MESSAGE.PASS, next_player, RECEIVER.ALL); 
+    });
+}
+
+function wait_phase()
+{
+    console.log("Waiting for next turn");
+    var btn = document.getElementById("phase_button");
+    btn.onclick = begin_turn;
+    var text = btn.firstChild;
+    text.data = "Wait";
+    $("#build_tag").css("color", "black");
+    $("#pass_tag").css("color", "yellow");
+    
+    /* Disable the phase button */
+    btn.disabled = true; 
+}
+
+//console.log(window.screen.availHeight);
+//console.log(window.screen.availWidth);
+
+</script>
+
+</head>
+
+<body style="background-color: #87CEEB;">
+
+
+<!-- Side Panel -->
+<div id="left_panel">
+    <h2>Turn Phases</h2>
+    <div id="dice_bg">
+        <script type='text/javascript' src='http://lucx.info/catan/dice/d6.js'></script>
+        <script type='text/javascript'>
+        D6.dice(2, d6_callback, "dice/");
+        </script>
+        <button id="phase_button" onclick="D6AnimBuilder.get('dice').reset(); D6AnimBuilder.get('dice').start()">
+            Roll
+        </button>
+    </div>
+    <div id="blank_div"></div>
+    <h4 id="roll_tag">1. Roll</h4>
+    <h4 id="trade_tag">2. Trade</h4>
+    <h4 id="build_tag">3. Build</h4>
+    <h4 id="pass_tag">4. Pass</h4>
+    <h2>Players</h2>
+    <table id="player_table" border="1" style="margin: 0px 10px;"></table>
+    <h2>Victory Points</h2>
+    <p class="pp">Towns/Cities: <span id="town_points" class=".pp">0</span></p>
+    <p class="pp">VP Cards: <span id="vpcard_points" class=".pp">0</span></p>
+    <p class="pp">Longest Road: <span id="road_points" class=".pp">0</span></p>
+    <p class="pp">Largest Army: <span id="army_points" class=".pp">0</span></p>
+    <p class="pp">Total: <span id="total_points" class=".pp">0</span></p>
+    <!--
+    <hr color="black">
+    <div style="position: absolute; bottom: 0; ">
+        <img src="images/costs.jpg" width="150" height="160">
+    </div>
+    -->
+</div>
+
+<!-- Game Board -->
+<div id="game_container">
+    <canvas id="board" width='620px' height='565px'></canvas>
+    <div id="board_shade" hidden></div> 
+    <div id="board_popup" hidden></div>    
+</div>
+
+<!-- Right Panel -->
+<div id="right_panel">
+    <h2>Trade Menu</h2>
+        <ul2 class="vertical">
+            <button id="bank_button">Bank</button>
+            <button id="port_button">Port</button>
+            <button id="player_button">Player</button>
+        </ul2>
+    <h2>Build Menu</h2>
+        <ul2 class="vertical">
+            <button id="road_button">Road</button>
+            <button id="town_button">Settlement</button>
+            <button id="city_button">City</button>
+            <button id="card_button">Development Card</button>
+        </ul2>
+    <h2>Resources</h2>
+        <table border="1" style="width:100%">
+            <tr>
+                <td><img class="rcard" src="images/resources/grain.jpg" width="30" height="40"></td>
+                <td><img class="rcard" src="images/resources/lumber.jpg" width="30" height="40"></td>
+                <td><img class="rcard" src="images/resources/wool.jpg" width="30" height="40"></td>
+                <td><img class="rcard" src="images/resources/brick.jpg" width="30" height="40"></td>
+                <td><img class="rcard" src="images/resources/ore.jpg" width="30" height="40"></td>
+            </tr>
+            <tr>
+                <td id="num_grain">0</td>
+                <td id="num_lumber">0</td> 
+                <td id="num_wool">0</td>
+                <td id="num_brick">0</td>
+                <td id="num_ore">0</td>
+            </tr>
+        </table>
+    <h2>Development Cards</h2>
+        <table border="1" style="float:left;">
+            <tr>
+                <td><img class="rcard" src="images/cards/knight.jpg" width="30" height="40"></td>
+                <td><img class="rcard" src="images/cards/palace.jpg" width="30" height="40"></td>
+            </tr>
+            <tr>
+                <td id="num_knight">0</td>
+                <td id="num_palace">0</td> 
+            </tr>
+        </table>
+        <ul3 class="vertical">
+            <button>View</button>
+            <button>Use</button>
+        </ul3>
+</div>
+
+<!-- Chat Panel -->
+<div id="chat_panel">
+    <textarea id="text_output" name="Text1" cols="36" rows="30" style="margin:10px; resize:none; background: #D5FBFF;" readonly ></textarea>
+    <textarea id="text_input" name="Text2" cols="36" rows="5" maxlength="255" style="margin:10px; resize:none; background: #D5FBFF;" ></textarea>
+</div>
+
+<script>
+
+/* Set up start_game button */
+$("#start_game").click( function()
+{
+    /* Start game and get first player */
+    $.post("http://lucx.info/catan/start_game.php",
+    function(response)
+    {
+        var first_player = response;
+        /* Set the turn */
+        send_message(MESSAGE.SET, first_player, RECEIVER.ALL); 
+        /* Refresh the page */
+        location.reload();
+    });
+});
+
+/* Check if enter was pressed in the chat box */
+$("#text_input").keypress(function(e) 
+{
+    if(e.which == 13) 
+    {
+        text = $("#text_input").val();
+        if ($.trim($("#text_input").val())) 
+        {
+            $("#text_input").val("");
+            var message = text; 
+            $.post("http://lucx.info/catan/send_message.php",
+            {tag: MESSAGE.CHAT, payload: message, receiver: "ALL"},
+            function(response)
+            {
+                console.log(response);
+            });
+        }        
+        return false;
+    }
+});
+
+/* Check messages from MySQL at the specified interval */
+setInterval(function()
+{
+    $.post("http://lucx.info/catan/check_message.php",
+    function(response)
+    {
+        if (response !== "NO_MESSAGES")
+        {
+            /* Parse response */
+            var result = $.parseJSON(response);
+
+            /* Iterate through and handle all new messages */
+            for (var i = 0; i < result.length; i++)
+                handle_message(result[i]);
+        }
+    });
+}, 500);
+
+function handle_message(message)
+{
+    var tag = message[2];
+    var payload = message[3];
+    var sender = message[4];
+    switch(tag)
+    {
+        case MESSAGE.SET:
+            /* Check what player I am */
+            $.post("http://lucx.info/catan/get_user.php",
+            function(response)
+            {
+                /* If it is my turn */
+                console.log(response+" : "+payload);
+                if (response == payload)
+                {
+                    console.log("my turn");
+                    setup_phase();
+                }
+                else
+                {
+                    console.log("your turn");
+                    wait_phase();
+                }
+            });
+            break;
+        case MESSAGE.PASS:
+            console.log("receive set message");
+            /* Get players in game and their colors */
+            $.post("http://lucx.info/catan/get_players.php", 
+            function(response)
+            {
+                /* Parse response */
+                var result = $.parseJSON(response);
+
+                /* Color inactive buttons */
+                for (var i = 0; i < result.length-1; i++)
+                {
+                    var player = result[i][1];
+                    var button = "#"+player+"_button";
+                    $(button).css("background-color", "#9FBCBF");
+                }
+
+                /* Color the active button */
+                var button = "#"+payload+"_button";
+                $(button).css("background-color", "yellow");
+            });
+
+            /* Check what player I am */
+            $.post("http://lucx.info/catan/get_user.php",
+            function(response)
+            {
+                /* If it is my turn */
+                console.log(response+" : "+payload);
+                if (response == payload)
+                {
+                    console.log("my turn");
+                    begin_turn();
+                }
+                else
+                {
+                    console.log("your turn");
+                    wait_phase();
+                }
+            });
+            break;
+        case MESSAGE.DCARD:
+            break;
+        case MESSAGE.MONOPOLY:
+            break;
+        case MESSAGE.ROBBER:
+            break;
+        case MESSAGE.TRADE:
+            break;
+        case MESSAGE.BUILD:
+            break;
+        case MESSAGE.CHAT:
+            $("#text_output").val($("#text_output").val()+sender+": "+payload+"\n");
+            break;
+    }
+}
+</script>
+
+<!-- Bottom Panel -->
+<div id="bottom_bar"></div>
+
+<!-- Hex Tile Images -->
+<div hidden>
+    <img src="images/forest.jpg" id = "forest" alt="NO IMG" height="42" width="42">
+    <img src="images/wheat.jpg" id = "wheat" alt="NO IMG" height="42" width="42">
+    <img src="images/pasture.jpg" id = "pasture" alt="NO IMG" height="42" width="42">
+    <img src="images/ore.jpg" id = "ore" alt="NO IMG" height="42" width="42">
+    <img src="images/brick.jpg" id = "brick" alt="NO IMG" height="42" width="42">
+    <img src="images/desert.jpg" id = "desert" alt="NO IMG" height="42" width="42">
+    <img src="images/water.jpg" id = "water" alt="NO IMG" height="42" width="42">
+</div>
+
+</body>
+</html>

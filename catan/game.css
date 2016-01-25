@@ -1,0 +1,238 @@
+/* Color scheme
+$light-blue = '#D5FBFF';
+$dark-blue = '#87CEEB';
+$light-gray = '#9FBCBF';
+$med-gray = '#647678';
+$dark-gray = '#2F3738';
+*/
+
+#game_container 
+{
+    width: 620px;
+    height: 565px;
+    position: relative;
+    float: left;
+}
+
+#board_shade 
+{
+    position: absolute;
+    z-index: 2;
+    background: black; 
+    opacity: 0.7;
+    height: 620px;
+    width: 565px;
+    top: 0;
+    left: 0;
+}
+
+#board_popup
+{
+    position: absolute;
+    z-index: 3;
+    background: white;
+    top: 50%;
+    left: 50%;
+    width: 200px;
+    height: 100px;
+}
+
+#board 
+{
+    background: #D5FBFF; 
+    box-shadow: inset 0 0 10px #2F3738;
+}
+
+#left_panel
+{
+    position: relative;
+    background-color:#647678;
+    height:565px;
+    width:150px;
+    float:left;
+    box-shadow: 0 0 10px  #2F3738;
+}
+
+#right_panel
+{
+    background-color:#647678;
+    height:565px;
+    width:200px;
+    float:left;
+    //clear:both;
+    box-shadow: 0 0 10px #2F3738;
+}
+
+#bottom_bar
+{
+    background-color: #2F3738;
+    height:15px;
+    width:1300px;
+    float:left;
+    color:white;
+    //clear:both;
+    box-shadow: 0 0 10px #2F3738;
+}
+
+#chat_panel
+{
+    background-color: #2F3738;
+    height:565px;
+    width:330px;
+    float:left;
+    color:white;
+    box-shadow: 0 0 10px #000000;
+}
+
+#dice_bg
+{
+    margin: 0 10px;
+    background-color: white;
+    height: 32px;
+    width: 69px;
+    box-shadow: 0px 0px 10px  #000000;
+}
+
+#blank_div
+{
+    height: 25px;
+    width: 150px;
+}
+
+ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #2F3738;
+    width: 1300px;
+}
+
+li {
+    float: left;
+}
+
+li a {
+    display: block;
+    color: white;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+}
+
+li a:hover:not(.active) {
+    background-color: #2A3C44;
+}
+
+.active {
+    color: black;
+    background-color: #9FBCBF;
+}
+
+ul2.vertical
+{
+    margin: 0;
+    padding: 0;
+}
+
+ul2.vertical button
+{
+    display: block;
+    margin: 0 0 3px 20px;
+    padding: 0 10px; 
+    background-color: #9FBCBF;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 100%;
+    padding: 1px;
+    width: 150px;    
+    box-shadow: 0 0 5px #2F3738;
+    border-bottom-left-radius:1em;
+    border-bottom-right-radius:1em;
+    border-top-left-radius:1em;
+    border-top-right-radius:1em;
+}
+
+ul3.vertical
+{
+    margin: 0 30px;
+    padding: 0;
+    float: right;
+}
+
+ul3.vertical button
+{
+    display: block;
+    margin: 0 0 3px 0;
+    background-color: #9FBCBF;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 100%;
+    width: 60px;    
+    box-shadow: 0 0 5px #2F3738;
+    border-bottom-left-radius:1em;
+    border-bottom-right-radius:1em;
+    border-top-left-radius:1em;
+    border-top-right-radius:1em;
+}
+
+ul2.vertical h1
+{
+    display: block;
+    padding: 0 10px; 
+    background-color: #9FBCBF;
+    font-family: "Times New Roman", Times, serif;
+    font-size: 100%;
+    text-align: center;
+    color: black;
+    padding: 2px;
+    width: 150px;    
+    border: none;
+    box-shadow: 0 0 5px #2F3738;
+}
+
+h2
+{
+    font-size: 18px;
+    box-shadow: 0 0 5px #2F3738;
+    padding: 4px;
+}
+
+h3
+{
+    margin: 0; 
+    padding: 10px 30px; 
+    color: white;
+    float: right;
+}
+
+h4
+{
+    margin: 10px 10px;
+}
+
+
+.pp
+{
+    margin: 0px 10px;
+}
+
+.pp span
+{
+    float:right; 
+    margin: 0px 10px;
+}
+
+.rcard
+{
+    margin: 0px 0px;
+    box-shadow: 0 0 5px #2F3738;
+}
+
+
+Red {background-color: red;}
+Blue {background-color: blue;}
+Orange {background-color: orange;}
+White {background-color: white;}
+
+td { height: 100%;}
+.bg { background-color: #f00; width: 100%; height: 100%; display: block; }
+

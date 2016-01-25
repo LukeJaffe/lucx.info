@@ -1,0 +1,121 @@
+<html>
+
+<head>
+
+<script src="jquery-1.11.3.min.js"></script>
+
+<style>
+
+h1
+{
+    color: black;
+    text-align: center;
+    font-family: "Calibri";
+    font-size: xx-large;
+}
+
+h2
+{
+    position: fixed;
+    top: 250px;
+    left: 50px;
+    color: red;
+    text-align: center;
+    font-family: "Calibri";
+    font-size: large;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Catan Lobby</h1>
+
+<table id="game_table" border="1" cellpadding="5" cellspacing="5">
+    <tr>
+        <td><input type="submit" id="new_button" value="New"></a></td>
+        <td></td>
+        <td>
+            <select id="player_select">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+            </select>
+        </td>
+    </tr>
+</table>
+
+<h2></h2>
+
+<script>
+
+/* Refresh page every second */
+function refresh()
+{
+    location.reload();
+}
+
+//setInterval(refresh, 1000);
+
+/* Fetch entries from mysql */
+var num_games = 0;
+$.post("http://lucx.info/catan/get_games.php", 
+function(response)
+{
+    /* Add column titles to table */
+    var table = document.getElementById("game_table");
+    var row = table.insertRow(0);
+    var cell1 = row.insertCell(0);
+    var cell2 = row.insertCell(1);
+    var cell3 = row.insertCell(2);
+    cell1.innerHTML = "<th><b>Game</b></th>";
+    cell2.innerHTML = "<th><b>Host</b></th>";
+    cell3.innerHTML = "<th><b>Players</b></th>";
+
+    /* Parse response */
+    var result = $.parseJSON(response);
+    num_games = result.length+1;
+    for (var i = 0; i < result.length; i++)
+    {
+        var row = table.insertRow(1);
+        var cell1 = row.insertCell(0);
+        var cell2 = row.insertCell(1);
+        var cell3 = row.insertCell(2);
+        cell1.innerHTML = "<td><a href='javascript:void(0);' onclick='join_game(\""+result[i][0]+"\");'>"+result[i][0]+"</a></td>";
+        cell2.innerHTML = "<td>"+result[i][1]+"</td>";
+        cell3.innerHTML = "<td>"+result[i][2]+"</td>";
+    }
+});
+
+/* Jquery button to add new game*/ 
+$('#new_button').click(function()
+{
+    var players = document.getElementById("player_select").value;
+    $.post("http://lucx.info/catan/create_game.php", 
+    {game: "Game"+num_games, players: players},
+    function(response)
+    {
+        $("h2").html(response);
+    });
+    location.reload();
+});
+
+/* Javascript function to join game */
+function join_game(game)
+{
+    $.post("http://lucx.info/catan/join_game.php", {game: game}, function(response)
+    {
+        if (response == 0 || response == 1)
+            window.location.href = "http://lucx.info/catan/setup.html";
+        else
+            $("h2").html(response);
+    });
+}
+
+</script>
+
+</body>
+
+<html>
+

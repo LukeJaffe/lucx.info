@@ -1,0 +1,37 @@
+<html>
+
+<head>
+
+<script src="jquery-1.11.3.min.js"></script>
+<link rel="stylesheet" type="text/css" href="/home/pp_home.css">
+
+</head>
+
+<body>
+
+<ul class="horizontal-list">
+  <li><a href="/home/index.html">Home</a></li>
+  <li><a class="active" href="#games">Games</a></li>
+  <li><a href="/home/register.html">Register</a></li>
+  <li><a href="/home/login.html">Login</a></li>
+  <li><a href="/home/logout.html">Logout</a></li>
+</ul>
+
+<ul class="vertical-list">
+    <li><a href="http://lucx.info/snake/snake.html">Snake</a><li>
+    <li><a href="http://lucx.info/catan/index.html">Catan</a><li>
+    <li><a href="http://lucx.info/square/index.html">Square</a><li>
+</ul>
+
+<script>
+
+$.post( "http://lucx.info/session.php", function(response)
+{
+    /* Give feedback to user */
+    $("h3").html("Welcome: "+response);
+});
+
+</script>
+
+</body>
+</html>
