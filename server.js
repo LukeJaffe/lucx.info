@@ -252,7 +252,7 @@ app.post('/session', urlencoded_parser, function (req, res)
     } 
     else 
     {
-        res.redirect('/login');
+        //res.redirect('/login');
     }
 });
 
@@ -349,11 +349,64 @@ var CatanPlayerSchema = mongoose.Schema(
 /* Catan game schema */
 var CatanGameSchema = mongoose.Schema(
 {
-    host: {type: String, required: true, unique: true},
+    host: {type: String, required: true},//, unique: true},
     max_players: {type: Number, required: true},
     started: {type: Boolean, required: true},
-    players: [CatanPlayerSchema]
+    players: [CatanPlayerSchema],
+    id: Number
 });
+
+CatanGameSchema.methods.create = function(socket)
+{
+    game = this;
+
+    CatanGame.find().distinct('id', function(err, ids) 
+    {
+        ids = ids.sort(function (a, b) 
+        { 
+            return a - b;
+        });
+        console.log(ids);
+        if (ids.length > 0)
+        {
+            max = Math.max.apply(null, ids);
+            if (ids.length < max+1)
+            {
+                for (var i = 0; i < max; i++)
+                {
+                    if (ids.indexOf(i) == -1)
+                    {
+                        game.id = i;     
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                game.id = max+1;
+            }
+        }
+        else
+        {
+            game.id = 0;
+        }
+
+        game.save( function(err)
+        {
+            if (err)
+                if (err.code == 11000)
+                    socket.emit('new_game_failure'); 
+                else
+                    console.log(err);
+            else
+            {
+                console.log("Creating Game"+game.id);
+                // broadcast message to update
+                io.sockets.emit('new_game_success');
+            }    
+        });
+    });  
+};
 
 var CatanGame = mongoose.model('CatanGame', CatanGameSchema);
 
@@ -367,7 +420,6 @@ io.sockets.on('connection', function(socket)
     socket.on('new_game', function(data)
     {
         console.log("Starting new game...");
-        console.log(data);
 
         var catan_game = new CatanGame(
         {
@@ -376,13 +428,14 @@ io.sockets.on('connection', function(socket)
             started: false
         });
 
-        catan_game.save();
+        catan_game.create(socket);
+
     });
 
     // Catan lobby
     socket.on('get_games', function(data)
     {
-        CatanGame.find({}, function(err, games)
+        CatanGame.find(null, null, {sort: {'id': -1}}, function(err, games)
         {
             socket.emit('game_data', {'games': games});
         });

@@ -51,16 +51,20 @@ h2
 
 <script>
 
-
 var socket = io.connect();
+var username = "GUEST";
 
-get_games();
-//socket.emit('login_data', {'username':username_field, 'password':password_field});
-
-function get_games()
+/* Get username from session data */
+$.post( "http://lucx.info/session", function(response)
 {
-    socket.emit('get_games', {});
+    username = response;
+});
 
+setup_table();
+get_games();
+
+function setup_table()
+{
     var table = document.getElementById("game_table");
     var row = table.insertRow(0);
     var cell1 = row.insertCell(0);
@@ -71,53 +75,67 @@ function get_games()
     cell3.innerHTML = "<th><b>Players</b></th>";
 }
 
+function get_games()
+{
+    socket.emit('get_games', {});
+}
+
 socket.on('game_data', function(data)
 {
-    var host = data.host;
-    var max_players = data.max_players;
-    var started = data.started;
+    var table = document.getElementById("game_table");
+
+    // Remove all entries currently in games table
+    var len = table.rows.length;
+    while (table.rows.length > 2)
+    {
+        table.deleteRow(table.rows.length-1);
+    }
+
+    // Add entries to games table 
+    var games = data.games;
+    for (var i = 0; i < games.length; i++)
+    {
+        var row = table.insertRow(2);
+        var cell1 = row.insertCell(0);
+        var cell2 = row.insertCell(1);
+        var cell3 = row.insertCell(2);
+        cell1.innerHTML = "<td><a href='javascript:void(0);' onclick='join_game(\""+games[i].id+"\");'>"+"Game "+games[i].id+"</a></td>";
+        cell2.innerHTML = "<td>"+games[i].host+"</td>";
+        cell3.innerHTML = "<td>"+games[i].max_players+"</td>";
+    }
 });
 
 // Jquery button to add new game
 $('#new_button').click(function()
 {
-    var max_players = document.getElementById("player_select").value;
-
-    socket.emit('new_game', {'max_players': max_players});
-});
-
-/*
-// Fetch entries from mysql 
-var num_games = 0;
-$.post("http://lucx.info/catan/get_games.php", 
-function(response)
-{
-    // Add column titles to table
-    var table = document.getElementById("game_table");
-    var row = table.insertRow(0);
-    var cell1 = row.insertCell(0);
-    var cell2 = row.insertCell(1);
-    var cell3 = row.insertCell(2);
-    cell1.innerHTML = "<th><b>Game</b></th>";
-    cell2.innerHTML = "<th><b>Host</b></th>";
-    cell3.innerHTML = "<th><b>Players</b></th>";
-
-    // Parse response
-    var result = $.parseJSON(response);
-    num_games = result.length+1;
-    for (var i = 0; i < result.length; i++)
+    if (username != "GUEST")
     {
-        var row = table.insertRow(1);
-        var cell1 = row.insertCell(0);
-        var cell2 = row.insertCell(1);
-        var cell3 = row.insertCell(2);
-        cell1.innerHTML = "<td><a href='javascript:void(0);' onclick='join_game(\""+result[i][0]+"\");'>"+result[i][0]+"</a></td>";
-        cell2.innerHTML = "<td>"+result[i][1]+"</td>";
-        cell3.innerHTML = "<td>"+result[i][2]+"</td>";
+        var max_players = document.getElementById("player_select").value;
+        socket.emit('new_game', {'host': username, 'max_players': max_players});
+    }
+    else
+    {
+        console.log("Login to create game");
     }
 });
 
+socket.on('new_game_success', function()
+{
+    get_games();
+});
+
+socket.on('new_game_failure', function()
+{
+    $("h2").html("This host has already created a game.");
+});
+
+function join_game(id)
+{
+    console.log("Joining game: "+id);
+}
+
 // Javascript function to join game
+/*
 function join_game(game)
 {
     $.post("http://lucx.info/catan/join_game.php", {game: game}, function(response)
