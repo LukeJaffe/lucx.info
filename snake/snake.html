@@ -2,10 +2,21 @@
 <body>
 
 <head>
-<script src="jquery-1.11.3.min.js"></script>
+<script src="/utils/jquery-1.11.3.min.js"></script>
+<script src="/home/pp_home.css"></script>
+<link rel="stylesheet" type="text/css" href="/home/pp_home.css">
 </head>
 
-<canvas id="myCanvas" width="500" height="500" tabindex='0'></canvas>
+<ul class="horizontal-list">
+  <li><a href="/home/index.html">Home</a></li>
+  <li><a href="/home/games.html">Games</a></li>
+  <li><a href="/home/register.html">Register</a></li>
+  <li><a href="/home/login.html">Login</a></li>
+  <li style="float: right;"><a href="/logout">Logout</a></li>
+  <h3></h3>
+</ul>
+
+<canvas id="myCanvas" width="500" height="500" tabindex='0' style="background-color: #D5FBFF;"></canvas>
 
 <script>
 
@@ -18,24 +29,24 @@ function Comparator(a,b)
 function add_score(score)
 {
     var name = "guest";
-    $.post( "http://lucx.info/snake.php", { p1: "WRITE", p2: name, p3: score } );
+    $.post( "http://lucx.info/snake", 
+    {action: "WRITE", score: score});
 }
 
 var scoreboard = [];
 
 function top_ten()
 {
-    $.post( "http://lucx.info/snake.php", { p1: "READ" }, function(response)
+    console.log("top ten");
+    $.post( "http://lucx.info/snake", 
+    {action: "READ"}, 
+    function(response)
     {
-        entries = response.split(" ");
         scoreboard = [];
-        for (i = 0; i < entries.length; i++)
+        for (i = 0; i < response.length; i++)
         {
-            entry = entries[i].split("|");
-            if (typeof(entry[1]) != "undefined")
-            {
-                scoreboard.push([entry[0], parseInt(entry[1])]);
-            }
+            entry = response[i];
+            scoreboard.push([entry.username, entry.score]);
         }
         scoreboard.sort(Comparator);
     });
@@ -44,6 +55,7 @@ function top_ten()
 var c = document.getElementById("myCanvas");
 var ctx = c.getContext("2d");
 
+var start = false;
 var alive = true;
 var update = true;
 
@@ -56,9 +68,15 @@ var cat = 0;
 
 var handleclick=function(e)
 {
-    if (!alive)
+    if (!start)
     {
         reset();        
+        start = true;
+    }
+    else if (!alive)
+    {
+        reset();        
+        alive = true;
     }
 };
 
@@ -67,6 +85,7 @@ c.addEventListener("keydown", handlekeydown, false);
 c.focus();
 
 var score = 0;
+var moving = false;
 
 var pixel_s = 5;
 var box_w = pixel_s;
@@ -75,15 +94,21 @@ var box_h = pixel_s;
 var start_x = 50;
 var start_y = 50;
 
-reset();
-draw();
+start_screen();
+
+function start_screen()
+{
+    ctx.fillStyle = "blue";
+    ctx.font = "48px Arial";
+    ctx.fillText("CLICK TO START", 50, 100);
+}
 
 function reset()
 {
     x_pos = start_x;
     y_pos = start_y;
     snake = [[x_pos,y_pos],[x_pos-5,y_pos],[x_pos-10,y_pos],[x_pos-15,y_pos],[x_pos-20,y_pos]];
-    score = snake.length
+    score = 0;
 
     moving = true;
     x_mov = 1;
@@ -92,7 +117,6 @@ function reset()
     food_x = 250;
     food_y = 250;
 
-    alive = true;
     update = true;
 }
 
@@ -169,7 +193,7 @@ function draw()
         // Score banner
         ctx.fillStyle = "green";
         ctx.font = "bold 24px Arial";
-        ctx.fillText("Score: "+snake.length, 200, 150);
+        ctx.fillText("Score: "+score, 200, 150);
         // High Score Banner
         ctx.fillStyle = "blue";
         ctx.font = "bold 24px Arial";
@@ -209,7 +233,7 @@ function eat()
     food_x -= food_x%5;
     food_y = Math.random()*500;
     food_y -= food_y%5;
-    grow()
+    grow();
 }
 
 function grow()
@@ -236,8 +260,8 @@ function grow()
         else
             new_x = last_x + pixel_s;
     }
-    snake.push([new_x, new_y]) 
-    score = snake.length
+    snake.push([new_x, new_y]); 
+    score = snake.length-5;
 }
 
 

@@ -109,10 +109,11 @@ fieldset p
 
 h1
 {
-    color: DARK3;
+    color: LIGHT1;
     text-align: center;
     font-family:impact,charcoal,arial, helvetica,sans-serif;
-    font-size: xx-large;
+    font-size: 1000%;
+    text-shadow: -10px 0 DARK3, 0 10px DARK3, 10px 0 DARK3, 0 -10px DARK3;
 }
 
 h2
@@ -128,8 +129,11 @@ h2
 
 h3
 {
-    color: white;
-    text-align: right;
-    padding: 0px 50px;
+    padding: 14px 16px;
+    margin: 0;
+    color: LIGHT1;
+    text-align: center;
     font-size: medium;
+    font-family:impact,charcoal,arial, helvetica,sans-serif;
+    text-shadow: -1px 0 DARK2, 0 1px DARK2, 1px 0 DARK2, 0 -1px DARK2;
 }

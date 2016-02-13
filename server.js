@@ -2,6 +2,7 @@ var http = require('http');
 var url = require('url');
 var fs = require('fs');
 var express = require('express');
+var body_parser = require('body-parser');
 var session = require('client-sessions');
 var mongoose = require('mongoose');
 var colors = require('./colors');
@@ -13,10 +14,12 @@ COLOR = colors.SCHEME1;
 var app = express();
 
 app.use(session({
-  cookieName: 'session',
-  secret: 'random_string_goes_here',
-  duration: 30 * 60 * 1000,
-  activeDuration: 5 * 60 * 1000,
+    cookieName: 'session',
+    secret: 'gPYeO1LwyEBj5FpS4LSH',
+    duration: 30 * 60 * 1000,
+    activeDuration: 5 * 60 * 1000,
+    httpOnly: true,
+    ephemeral: true
 }));
 
 function prep_css(base, file)
@@ -60,70 +63,26 @@ var UserSchema = mongoose.Schema(
     password: {type: String, required: true}
 });
 
-function login_error(socket, code)
+UserSchema.methods.login = function(req, res)
 {
-    switch (code)
+    User.findOne({username: this.username, password: this.password}, function(err, user) 
     {
-        case mongoose_codes.USER.LOGIN.CODE.FAILURE:
-            socket.emit('login_result', {'message': 'Login failure.'});
-            break;
-        case mongoose_codes.USER.LOGIN.CODE.NOT_FOUND:
-            socket.emit('login_result', {'message': 'Invalid username password combination.'});
-            break;
-        case mongoose_codes.USER.LOGIN.CODE.FOUND:
-            socket.emit('login_result', {'message': 'Successful login!'});
-            /* Start session */
-            break;
-        default:
-            socket.emit('login_result', {'message': 'User.login(): IMPOSSIBLE ERROR'});
-    }
-}
-
-function register_error(socket, code)
-{
-    switch (code)
-    {
-        case mongoose_codes.USER.REGISTER.CODE.FAILURE:
-            socket.emit('register_result', {'message': 'Register failure.'});
-            break;
-        case mongoose_codes.USER.REGISTER.CODE.DUP_KEY:
-            socket.emit('register_result', {'message': 'This username has already been taken!'});
-            break;
-        case mongoose_codes.USER.REGISTER.CODE.VALIDATION:
-            socket.emit('register_result', {'message': 'Username and password fields must not be empty!'});
-            break;
-        case mongoose_codes.USER.REGISTER.CODE.SUCCESS:
-            socket.emit('register_result', {'message': 'Successful registration!'});
-            break;
-        default:
-            socket.emit('register_result', {'message': 'User.register(): IMPOSSIBLE ERROR'});
-    }
-}
-
-UserSchema.methods.login = function(socket)
-{
-    User.find({ username: this.username, password: this.password }, function(err, user) 
-    {
-        if (err) 
-            login_error(socket, mongoose_codes.USER.LOGIN.CODE.FAILURE);
-        else
+        if (!user) 
         {
-            /* MUST use if/else instead of switch case because of empty js object */
-            if (user == mongoose_codes.USER.LOGIN.RETURN.NOT_FOUND)
-            {
-                process.stdout.write("User not found in db.\n");
-                login_error(socket, mongoose_codes.USER.LOGIN.CODE.NOT_FOUND);
-            }
-            else
-            {
-                process.stdout.write("User authenticated!\n");
-                login_error(socket, mongoose_codes.USER.LOGIN.CODE.FOUND);
-            }
+            console.log("Invalid username password combination.");
+            res.send("1"); 
+        } 
+        else 
+        {
+            console.log("User authenticated!");
+            req.session.user = user;
+            /* Return user to homepage */
+            res.send("0");
         }
     });  
 };
 
-UserSchema.methods.register = function(socket)
+UserSchema.methods.register = function(req, res)
 {
     this.save(function(err)
     {
@@ -131,24 +90,24 @@ UserSchema.methods.register = function(socket)
         {
             if (err.code == mongoose_codes.USER.REGISTER.ERROR.DUP_KEY)
             {
-                process.stdout.write("User.save(): DUPLICATE KEY ERROR\n");
-                register_error(socket, mongoose_codes.USER.REGISTER.CODE.DUP_KEY); 
+                console.log("User.save(): DUPLICATE KEY ERROR\n");
+                res.send("This username has already been taken!"); 
             }
             else if (err.name == mongoose_codes.USER.REGISTER.ERROR.VALIDATION)
             {
-                process.stdout.write("User.register(): VALIDATION ERROR\n");
-                register_error(socket, mongoose_codes.USER.REGISTER.CODE.VALIDATION); 
+                console.log("User.register(): VALIDATION ERROR\n");
+                res.send("Username and password fields must not be empty!"); 
             }
             else
             {
-                process.stdout.write("User.register(): UNKNOWN ERROR: "+err+"\n");
-                register_error(socket, mongoose_codes.USER.REGISTER.CODE.FAILURE); 
+                console.log("User.register(): UNKNOWN ERROR: "+err+"\n");
+                res.send("Registration failure."); 
             }
         }
         else
         {
-            process.stdout.write("User saved successfully!\n");
-                register_error(socket, mongoose_codes.USER.REGISTER.CODE.SUCCESS); 
+            console.log("User saved successfully!\n");
+            res.send("Successful registration!"); 
         }
     });
 };
@@ -158,46 +117,219 @@ var User = mongoose.model('User', UserSchema);
 /* Process style sheets */
 prep_css("home", "home.css");
 
+/* Middleware */
+app.use(function(req, res, next) 
+{
+    if (req.session && req.session.user) 
+    {
+        User.findOne({ username: req.session.user.username }, function(err, user) 
+        {
+            if (user) 
+            {
+                req.user = user;
+                delete req.user.password; // delete the password from the session
+                req.session.user = user;  //refresh the session value
+                res.locals.user = user;
+            }
+            // finishing processing the middleware and run the route
+            next();
+        });
+    } 
+    else 
+    {
+        next();
+    }
+});
+
+/*****************************
+** Process all home requests **
+*****************************/
+
+/* GET requests */
 app.get('/utils/jquery-1.11.3.min.js', function (req, res) 
 {
     res.sendFile( __dirname + "/utils/" + "jquery-1.11.3.min.js" );
-})
+});
 
 app.get('/home/pp_home.css', function (req, res) 
 {
     res.sendFile( __dirname + "/home/" + "pp_home.css" );
-})
+});
 
 app.get('/', function (req, res) 
 {
     res.sendFile( __dirname + "/home/" + "index.html" );
-})
+});
 
 app.get('/index.html', function (req, res) 
 {
     res.sendFile( __dirname + "/home/" + "index.html" );
-})
+});
 
 app.get('/home/index.html', function (req, res) 
 {
     res.sendFile( __dirname + "/home/" + "index.html" );
-})
+});
 
 app.get('/home/games.html', function (req, res) 
 {
     res.sendFile( __dirname + "/home/" + "games.html" );
-})
+});
 
 app.get('/home/register.html', function (req, res) 
 {
     res.sendFile( __dirname + "/home/" + "register.html" );
-})
+});
 
 app.get('/home/login.html', function (req, res) 
 {
     res.sendFile( __dirname + "/home/" + "login.html" );
-})
+});
 
+app.get('/home/facebook.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/home/" + "facebook.html" );
+});
+
+
+app.get('/logout', function (req, res) 
+{
+    console.log("Logging out...");
+    /* Logout of session */
+    req.session.reset(); 
+    /* Return user to homepage */
+    res.redirect("/");
+});
+
+/* POST requests */
+var urlencoded_parser = body_parser.urlencoded({ extended: false })
+
+app.post('/login', urlencoded_parser, function (req, res) 
+{
+    var user = new User(
+    {
+        username: req.body.username,
+        password: req.body.password
+    });
+    user.login(req, res);
+});
+
+app.post('/register', urlencoded_parser, function (req, res) 
+{
+    var user = new User(
+    {
+        firstname: req.body.firstname,
+        lastname: req.body.lastname,
+        email: req.body.email,
+        username: req.body.username,
+        password: req.body.password
+    });
+    user.register(req, res);
+});
+
+app.post('/session', urlencoded_parser, function (req, res) 
+{
+    if (req.session && req.session.user) 
+    {   // Check if session exists
+        // lookup the user in the DB by pulling their email from the session
+        User.findOne({ username: req.session.user.username }, function (err, user) 
+        {
+            if (!user) 
+            {
+                // if the user isn't found in the DB, reset the session info and
+                // redirect the user to the login page
+                req.session.reset();
+                res.send('GUEST'.toJSON());
+            } 
+            else 
+            {
+                // expose the user to the template
+                ///res.locals.user = user;
+                // render the dashboard page
+                res.send(user.username);
+            }
+        });
+    } 
+    else 
+    {
+        res.redirect('/login');
+    }
+});
+
+
+/******************************
+** Process all snake requests **
+******************************/
+
+/* Snake schema */
+var SnakeSchema = mongoose.Schema(
+{
+    username: String,
+    score: Number
+});
+
+var Snake = mongoose.model('Snake', SnakeSchema);
+
+/* GET requests */
+app.get('/snake/snake.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/snake/" + "snake.html" );
+});
+
+/* POST requests */
+app.post('/snake', urlencoded_parser, function (req, res) 
+{
+    action = req.body.action;
+    if (action == "WRITE")
+    {
+        var username;
+        if (req.session && req.session.user) 
+            username = req.session.user.username;
+        else 
+            username = "guest";
+
+        var snake = new Snake(
+        {
+            username: username,
+            score: req.body.score
+        });
+        
+        snake.save(function(err)
+        {
+            if (err)
+                console.log(err);
+        });
+    }
+    else if (action == "READ")
+    {
+        Snake.find({}, function(err, snakes)
+        {
+            if (!err)
+                res.send(snakes);
+            else
+                console.log(err);
+        });
+    }
+    else
+    {
+        console.log("Impossible snake action.");
+    }
+});
+
+
+/******************************
+** Process all snake requests **
+******************************/
+
+/* GET requests */
+app.get('/catan/index.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/catan/" + "index.html" );
+});
+
+/******************
+** Set up server **
+******************/
 var server = app.listen(80, function () {
 
   var host = server.address().address
@@ -207,14 +339,57 @@ var server = app.listen(80, function () {
 
 })
 
+/* Catan player schema */
+var CatanPlayerSchema = mongoose.Schema(
+{
+    username: String,
+    color: String
+});
 
-// use socket.io
+/* Catan game schema */
+var CatanGameSchema = mongoose.Schema(
+{
+    host: {type: String, required: true, unique: true},
+    max_players: {type: Number, required: true},
+    started: {type: Boolean, required: true},
+    players: [CatanPlayerSchema]
+});
+
+var CatanGame = mongoose.model('CatanGame', CatanGameSchema);
+
+
+/* Set up socket.io */
 var io = require('socket.io').listen(server);
 
-// define interactions with client
+/* define interactions with client */
 io.sockets.on('connection', function(socket)
 {
-    /* Login message */
+    socket.on('new_game', function(data)
+    {
+        console.log("Starting new game...");
+        console.log(data);
+
+        var catan_game = new CatanGame(
+        {
+            host: data.host,
+            max_players: data.max_players,
+            started: false
+        });
+
+        catan_game.save();
+    });
+
+    // Catan lobby
+    socket.on('get_games', function(data)
+    {
+        CatanGame.find({}, function(err, games)
+        {
+            socket.emit('game_data', {'games': games});
+        });
+    });
+
+    /*
+    // Login message 
     socket.on('login_data', function(data)
     {
         var user = new User(
@@ -226,7 +401,7 @@ io.sockets.on('connection', function(socket)
         user.login(socket);
     });
 
-    /* Register message */
+    // Register message
     socket.on('register_data', function(data)
     {
         var user = new User(
@@ -240,5 +415,5 @@ io.sockets.on('connection', function(socket)
 
         user.register(socket);
     });
-
+    */
 });

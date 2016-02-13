@@ -14,7 +14,7 @@
   <li><a href="/home/games.html">Games</a></li>
   <li><a href="/home/register.html">Register</a></li>
   <li><a class="active" href="#login">Login</a></li>
-  <li style="float: right;"><a href="/home/index.html">Logout</a></li>
+  <li style="float: right;"><a href="/logout">Logout</a></li>
   <h3></h3>
 </ul>
 
@@ -33,37 +33,38 @@
 
 <script>
 
-/*
-$.post( "http://lucx.info/session.php", function(response)
+$.post( "http://lucx.info/session", function(response)
 {
     $("h3").html("Welcome: "+response);
 });
-*/
 
 var socket = io.connect();
 
+/*
 socket.on('login_result', function(data)
 {
     $("h2").html(data.message);
 });
+*/
 
 $('#submit').click(function()
 {
-    var username_field = document.getElementById("username_field").value;
-    var password_field = document.getElementById("password_field").value;
+    var username = document.getElementById("username_field").value;
+    var password = document.getElementById("password_field").value;
 
-    socket.emit('login_data', {'username':username_field, 'password':password_field});
-});
-
-/*
-$('#logout').click(function()
-{
-    $.post( "http://lucx.info/logout.php", function(response)
+    //socket.emit('login_data', {'username':username_field, 'password':password_field});
+    $.post( "http://lucx.info/login", 
+    {username: username, password: password},
+    function(response)
     {
-        $("h3").html("Welcome: "+response);
+        if (response == "0")
+            window.location.href = "http://lucx.info/"; 
+        else if (response == "1")
+            $("h2").html("Invalid username password combination.");
+        else
+            $("h2").html("INVALID");
     });
 });
-*/
 
 </script>
 
