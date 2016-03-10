@@ -67,7 +67,6 @@
         this.mouse_down = false;
         this.last_mouse_x = null;
         this.last_mouse_y = null;
-
     }
 
     Game.prototype.clear = function()
@@ -78,62 +77,49 @@
 
     Game.prototype.tick = function() 
     {
-        requestAnimFrame(game.tick);
-        game.draw();
+        requestAnimFrame(this.tick.bind(this));
+        this.draw();
+    }
+
+    function drawScene(vertices, method, colors5, colors6, color_idx, vpa, vca)
+    {
+        for (var i = 0; i < vertices.length; i++)
+        {
+            // vertex buffers
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertices[i]);
+            gl.vertexAttribPointer(vpa, vertices[i].itemSize, gl.FLOAT, false, 0, 0);
+
+            // color buffers
+            if (vertices[i].numItems == 5)
+            {
+                gl.bindBuffer(gl.ARRAY_BUFFER, colors5[color_idx]);
+                gl.vertexAttribPointer(vca, colors5[color_idx].itemSize, gl.FLOAT, false, 0, 0);
+            }
+            else if (vertices[i].numItems == 6)
+            {
+                gl.bindBuffer(gl.ARRAY_BUFFER, colors6[color_idx]);
+                gl.vertexAttribPointer(vca, colors6[color_idx].itemSize, gl.FLOAT, false, 0, 0);
+            }
+
+            // draw stuff
+            gl.drawArrays(method, 0, vertices[i].numItems);
+        }
     }
 
     Game.prototype.draw = function() 
     {
+        // set model view to identity
         this.clear();
 
         // model view transform
         this.view.world.clear_mv();
         this.view.world.set_mv();
 
-        for (var i = 0; i < faceVertexBuffers.length; i++)
-        {
-            // vertex buffers
-            gl.bindBuffer(gl.ARRAY_BUFFER, faceVertexBuffers[i]);
-            gl.vertexAttribPointer(this.shader.program.vertexPositionAttribute, faceVertexBuffers[i].itemSize, gl.FLOAT, false, 0, 0);
+        // set the shader matrices
+        this.view.set();
 
-            // color buffers
-            if (faceVertexBuffers[i].numItems == 5)
-            {
-                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers5[4]);
-                gl.vertexAttribPointer(this.shader.program.vertexColorAttribute, colorBuffers5[4].itemSize, gl.FLOAT, false, 0, 0);
-            }
-            else if (faceVertexBuffers[i].numItems == 6)
-            {
-                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers6[4]);
-                gl.vertexAttribPointer(this.shader.program.vertexColorAttribute, colorBuffers6[4].itemSize, gl.FLOAT, false, 0, 0);
-            }
-
-            // draw stuff
-            this.view.set();
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, faceVertexBuffers[i].numItems);
-        }
-
-        for (var i = 0; i < frameVertexBuffers.length; i++)
-        {
-            // vertex buffers
-            gl.bindBuffer(gl.ARRAY_BUFFER, frameVertexBuffers[i]);
-            gl.vertexAttribPointer(this.shader.program.vertexPositionAttribute, frameVertexBuffers[i].itemSize, gl.FLOAT, false, 0, 0);
-
-            // color buffers
-            if (faceVertexBuffers[i].numItems == 5)
-            {
-                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers5[1]);
-                gl.vertexAttribPointer(this.shader.program.vertexColorAttribute, colorBuffers5[1].itemSize, gl.FLOAT, false, 0, 0);
-            }
-            else if (faceVertexBuffers[i].numItems == 6)
-            {
-                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers6[1]);
-                gl.vertexAttribPointer(this.shader.program.vertexColorAttribute, colorBuffers6[1].itemSize, gl.FLOAT, false, 0, 0);
-            }
-            // draw stuff
-            this.view.set();
-            gl.drawArrays(gl.LINE_LOOP, 0, frameVertexBuffers[i].numItems);
-        }
+        drawScene(faceVertexBuffers, gl.TRIANGLE_STRIP, colorBuffers5, colorBuffers6, 4, this.shader.program.vertexPositionAttribute, this.shader.program.vertexColorAttribute);
+        drawScene(frameVertexBuffers, gl.LINE_LOOP, colorBuffers5, colorBuffers6, 1, this.shader.program.vertexPositionAttribute, this.shader.program.vertexColorAttribute);
     }
 
     Game.prototype.handle_mouse_down = function(event) 
@@ -239,8 +225,6 @@
     {
         this.gl.uniformMatrix4fv(this.shader.program.pMatrixUniform, false, this.camera.p);
         this.gl.uniformMatrix4fv(this.shader.program.mvMatrixUniform, false, this.world.mv);
-        //console.log(this.world.mv);
-        //console.log(this.camera.p);
     }
 
     /* Model View class */
@@ -335,6 +319,31 @@
     Goldberg.prototype.ray_triangle_collision = function(ray)
     {
 
+    }
+
+    Goldberg.prototype.draw = (vertices, method, colors5, colors6, color_idx, vpa, vca)
+    {
+        for (var i = 0; i < vertices.length; i++)
+        {
+            // vertex buffers
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertices[i]);
+            gl.vertexAttribPointer(vpa, vertices[i].itemSize, gl.FLOAT, false, 0, 0);
+
+            // color buffers
+            if (vertices[i].numItems == 5)
+            {
+                gl.bindBuffer(gl.ARRAY_BUFFER, colors5[color_idx]);
+                gl.vertexAttribPointer(vca, colors5[color_idx].itemSize, gl.FLOAT, false, 0, 0);
+            }
+            else if (vertices[i].numItems == 6)
+            {
+                gl.bindBuffer(gl.ARRAY_BUFFER, colors6[color_idx]);
+                gl.vertexAttribPointer(vca, colors6[color_idx].itemSize, gl.FLOAT, false, 0, 0);
+            }
+
+            // draw stuff
+            gl.drawArrays(method, 0, vertices[i].numItems);
+        }
     }
 
     function mvPushMatrix(matrix) 
@@ -515,12 +524,10 @@
     }
     */
 
-    var canvas, game;
-
     function webGLStart() 
     {
-        canvas = document.getElementById("canvas");
-        game = new Game(canvas);
+        var canvas = document.getElementById("canvas");
+        var game = new Game(canvas);
         gl = game.gl;
 
         // init buffers for frame of polyhedron
