@@ -116,13 +116,21 @@
 
         // model view transform
         this.view.world.clear_mv();
-        this.view.world.set_mv();
-
-        // set the shader matrices
-        this.view.set();
 
         // draw world objects
-        this.view.world.goldberg.draw();
+        for (var i = 0; i < this.view.world.goldberg.num; i++)
+        {
+            // push the current mv matrix on the stack
+            this.view.world.push_mv();
+            // set the mv matrix for goldberg i
+            this.view.world.set_mv(i);
+            // set the shader matrices
+            this.view.set();
+            // draw the goldberg
+            this.view.world.goldberg.draw(i);
+            // pop the top mv matrix off the stack
+            this.view.world.pop_mv();
+        }
     }
 
     Game.prototype.handle_mouse_down = function(event) 
@@ -238,7 +246,9 @@
         this.mv = mat4.create();
 
         // objects
-        this.goldberg = new Goldberg(gl, shader.program.vertexPositionAttribute, shader.program.vertexColorAttribute, [0,0,-6]);
+        this.goldberg = new Goldberg(gl, shader.program.vertexPositionAttribute, shader.program.vertexColorAttribute);
+        this.goldberg.add([-2,0,-10]);
+        this.goldberg.add([2,0,-10]);
     }
 
     World.prototype.clear_mv = function()
@@ -246,19 +256,25 @@
         mat4.identity(this.mv);
     }
 
-    World.prototype.set_mv = function()
+    World.prototype.set_mv = function(i)
     {
-        this.goldberg.set_mv(this.mv)
+        this.goldberg.set_mv(i, this.mv)
     }
 
     World.prototype.push_mv = function()
     {
-
+        var copy = mat4.create();
+        mat4.copy(copy, this.mv);
+        this.stack.push(copy);
     }
 
     World.prototype.pop_mv = function()
     {
-
+        if (this.stack.length == 0) 
+        {
+            throw "Invalid popMatrix!";
+        }
+        this.mv = this.stack.pop();
     }
 
     /* Perspective class */
@@ -280,8 +296,11 @@
     }
 
     /* Goldberg polyhedron class */
-    function Goldberg(gl, vpa, vca, p0)
+    function Goldberg(gl, vpa, vca)
     {
+        this.t_vecs = [];
+        this.r_mats = [];
+
         this.frame_vertices = [];
         this.face_vertices = [];
         this.colors6 = [];
@@ -314,22 +333,25 @@
         this.white = 3;
         this.black = 4;
 
-        // rotation matrix
-        this.r_matrix = mat4.create();
-        mat4.identity(this.r_matrix);
-        
-        // translation vector
-        this.t_vec = p0;
+        // number of goldbergs
+        this.num = 0;
     } 
 
-    Goldberg.prototype.set_t = function(t)
+    Goldberg.prototype.add = function(p)
     {
-        this.t_vec = t;
+        this.t_vecs.push(p);
+        //this.r_mats.push(r);
+        this.num++;
     }
 
-    Goldberg.prototype.update_r = function(r)
+    Goldberg.prototype.set_t = function(i, t)
     {
-        mat4.multiply(this.r_matrix, r, this.r_matrix);
+        this.t_vecs[i] = t;
+    }
+
+    Goldberg.prototype.update_r = function(i, r)
+    {
+        mat4.multiply(this.r_mats[i], r, this.r_mats[i]);
     }
 
     Goldberg.prototype.set_r = function()
@@ -337,10 +359,10 @@
 
     }
 
-    Goldberg.prototype.set_mv = function(mv)
+    Goldberg.prototype.set_mv = function(i, mv)
     {
-        mat4.translate(mv, mv, this.t_vec);
-        //mat4.multiply(mv, mv, this.r_matrix);
+        mat4.translate(mv, mv, this.t_vecs[i]);
+        //mat4.multiply(mv, mv, this.r_mats[i]);
     }
 
     Goldberg.prototype.ray_sphere_collision = function(ray)
@@ -382,22 +404,6 @@
             // draw stuff
             gl.drawArrays(method, 0, vertices[i].numItems);
         }
-    }
-
-    function mvPushMatrix(matrix) 
-    {
-        var copy = mat4.create();
-        mat4.copy(copy, matrix);
-        mvMatrixStack.push(copy);
-    }
-
-    function mvPopMatrix() 
-    {
-        if (mvMatrixStack.length == 0) 
-        {
-            throw "Invalid popMatrix!";
-        }
-        return mvMatrixStack.pop();
     }
 
     function degToRad(degrees) 
