@@ -67,6 +67,9 @@
         this.mouse_down = false;
         this.last_mouse_x = null;
         this.last_mouse_y = null;
+
+        this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        this.gl.enable(this.gl.DEPTH_TEST);
     }
 
     Game.prototype.clear = function()
@@ -118,8 +121,8 @@
         // set the shader matrices
         this.view.set();
 
-        drawScene(faceVertexBuffers, gl.TRIANGLE_STRIP, colorBuffers5, colorBuffers6, 4, this.shader.program.vertexPositionAttribute, this.shader.program.vertexColorAttribute);
-        drawScene(frameVertexBuffers, gl.LINE_LOOP, colorBuffers5, colorBuffers6, 1, this.shader.program.vertexPositionAttribute, this.shader.program.vertexColorAttribute);
+        // draw world objects
+        this.view.world.goldberg.draw();
     }
 
     Game.prototype.handle_mouse_down = function(event) 
@@ -215,7 +218,7 @@
         this.shader = shader;
 
         // world
-        this.world = new World();
+        this.world = new World(this.gl, this.shader);
 
         // camera
         this.camera = new Camera(this.gl);
@@ -228,14 +231,14 @@
     }
 
     /* Model View class */
-    function World()
+    function World(gl, shader)
     {
         // matrices
         this.stack = [];
         this.mv = mat4.create();
 
         // objects
-        this.goldberg = new Goldberg([0,0,-6]);
+        this.goldberg = new Goldberg(gl, shader.program.vertexPositionAttribute, shader.program.vertexColorAttribute, [0,0,-6]);
     }
 
     World.prototype.clear_mv = function()
@@ -277,16 +280,45 @@
     }
 
     /* Goldberg polyhedron class */
-    function Goldberg(p0)
+    function Goldberg(gl, vpa, vca, p0)
     {
-        this.frame_vertex_buffers = frameVertexBuffers;
-        this.face_vertex_buffers = faceVertexBuffers;
-        this.color_buffers_5 = colorBuffers5;
-        this.color_buffers_6 = colorBuffers6;
+        this.frame_vertices = [];
+        this.face_vertices = [];
+        this.colors6 = [];
+        this.colors5 = [];
 
+        // init buffers for frame of polyhedron
+        initFrameBuffers(gl, this.frame_vertices);
+
+        // init buffers for faces of polyhedron
+        initFaceBuffers(gl, this.face_vertices);
+
+        // init color buffers for pentagons
+        initColorBuffers5(gl, this.colors5);
+
+        // init color buffers for hexagons
+        initColorBuffers6(gl, this.colors6);
+
+        // vertex attributes
+        this.vpa = vpa;
+        this.vca = vca; 
+
+        // drawing methods
+        this.triangle_strip = gl.TRIANGLE_STRIP;
+        this.line_loop = gl.LINE_LOOP;
+
+        // colors
+        this.red = 0;
+        this.green = 1;
+        this.blue = 2;
+        this.white = 3;
+        this.black = 4;
+
+        // rotation matrix
         this.r_matrix = mat4.create();
         mat4.identity(this.r_matrix);
         
+        // translation vector
         this.t_vec = p0;
     } 
 
@@ -321,24 +353,30 @@
 
     }
 
-    Goldberg.prototype.draw = (vertices, method, colors5, colors6, color_idx, vpa, vca)
+    Goldberg.prototype.draw = function()
+    {
+        this.draw_verts(this.face_vertices, this.triangle_strip, this.black); 
+        this.draw_verts(this.frame_vertices, this.line_loop, this.green); 
+    }
+
+    Goldberg.prototype.draw_verts = function(vertices, method, color)
     {
         for (var i = 0; i < vertices.length; i++)
         {
             // vertex buffers
             gl.bindBuffer(gl.ARRAY_BUFFER, vertices[i]);
-            gl.vertexAttribPointer(vpa, vertices[i].itemSize, gl.FLOAT, false, 0, 0);
+            gl.vertexAttribPointer(this.vpa, vertices[i].itemSize, gl.FLOAT, false, 0, 0);
 
             // color buffers
             if (vertices[i].numItems == 5)
             {
-                gl.bindBuffer(gl.ARRAY_BUFFER, colors5[color_idx]);
-                gl.vertexAttribPointer(vca, colors5[color_idx].itemSize, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.colors5[color]);
+                gl.vertexAttribPointer(this.vca, this.colors5[color].itemSize, gl.FLOAT, false, 0, 0);
             }
             else if (vertices[i].numItems == 6)
             {
-                gl.bindBuffer(gl.ARRAY_BUFFER, colors6[color_idx]);
-                gl.vertexAttribPointer(vca, colors6[color_idx].itemSize, gl.FLOAT, false, 0, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.colors6[color]);
+                gl.vertexAttribPointer(this.vca, this.colors6[color].itemSize, gl.FLOAT, false, 0, 0);
             }
 
             // draw stuff
@@ -530,20 +568,6 @@
         var game = new Game(canvas);
         gl = game.gl;
 
-        // init buffers for frame of polyhedron
-        initFrameBuffers(gl, frameVertexBuffers);
-
-        // init buffers for faces of polyhedron
-        initFaceBuffers(gl, faceVertexBuffers);
-
-        // init color buffers for pentagons
-        initColorBuffers5(gl, colorBuffers5);
-
-        // init color buffers for hexagons
-        initColorBuffers6(gl, colorBuffers6);
-
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
-        gl.enable(gl.DEPTH_TEST);
 
         canvas.onmousedown = game.handle_mouse_down;
         document.onmouseup = game.handle_mouse_up;
