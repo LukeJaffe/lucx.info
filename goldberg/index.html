@@ -1,0 +1,457 @@
+<html>
+
+<head>
+<title>Goldberg Demo</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+<script type="text/javascript" src="gl-matrix.js"></script>
+<script type="text/javascript" src="webgl-utils.js"></script>
+<script type="text/javascript" src="verts.js"></script>
+
+<script id="shader-fs" type="x-shader/x-fragment">
+    precision mediump float;
+
+    varying vec4 vColor;
+
+    void main(void) {
+        gl_FragColor = vColor;
+    }
+</script>
+
+<script id="shader-vs" type="x-shader/x-vertex">
+    attribute vec3 aVertexPosition;
+    attribute vec4 aVertexColor;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+
+    varying vec4 vColor;
+
+    void main(void) {
+        gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+        vColor = aVertexColor;
+    }
+</script>
+
+
+<script type="text/javascript">
+
+    var gl;
+
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) {
+        }
+        if (!gl) {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+    }
+
+
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+            return null;
+        }
+
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+            if (k.nodeType == 3) {
+                str += k.textContent;
+            }
+            k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "x-shader/x-fragment") {
+            shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "x-shader/x-vertex") {
+            shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+            return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            alert(gl.getShaderInfoLog(shader));
+            return null;
+        }
+
+        return shader;
+    }
+
+
+    var shaderProgram;
+
+    function initShaders() 
+    {
+        var fragmentShader = getShader(gl, "shader-fs");
+        var vertexShader = getShader(gl, "shader-vs");
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert("Could not initialise shaders");
+        }
+
+        gl.useProgram(shaderProgram);
+
+        shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+        gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+        shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
+        gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
+
+        shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+        shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+    }
+
+    var mvMatrix = mat4.create();
+    var mvMatrixStack = [];
+    var pMatrix = mat4.create();
+
+    function mvPushMatrix() {
+        var copy = mat4.create();
+        mat4.copy(copy, mvMatrix);
+        mvMatrixStack.push(copy);
+    }
+
+    function mvPopMatrix() {
+        if (mvMatrixStack.length == 0) {
+            throw "Invalid popMatrix!";
+        }
+        mvMatrix = mvMatrixStack.pop();
+    }
+
+
+    function setMatrixUniforms() {
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+    }
+
+
+    function degToRad(degrees) {
+        return degrees * Math.PI / 180;
+    }
+
+
+    function setMatrixUniforms() {
+        gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+        gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
+    }
+
+    var mouseDown = false;
+    var lastMouseX = null;
+    var lastMouseY = null;
+
+    var rotationMatrix = mat4.create();
+    mat4.identity(rotationMatrix);
+
+    function handleMouseDown(event) {
+        mouseDown = true;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+    }
+
+
+    function handleMouseUp(event) {
+        mouseDown = false;
+    }
+
+    function unproject(mm, pm, winx, winy, winz) 
+    {
+      var canvas = document.getElementById("canvas");
+      // winz is either 0 (near plane), 1 (far plane) or somewhere in between.
+      // if it's not given a value we'll produce coords for both.
+      if (typeof(winz) == "number") {
+        r = canvas.getBoundingClientRect();
+
+        winx = parseFloat(winx);
+        winy = r.height-parseFloat(winy);
+        winz = parseFloat(winz);
+
+        var inf = vec4.create();
+        var viewport = [r.left, r.top, r.width, r.height];
+
+        //Calculation for inverting a matrix, compute projection x modelview; then compute the inverse
+        var m = mat4.copy(mat4.create(), mm);
+        
+        mat4.invert(m, m); // WHY do I have to do this? --see Jax.Context#reloadMatrices
+        mat4.multiply(m, pm, m);
+        mat4.invert(m, m);
+
+        // Transformation of normalized coordinates between -1 and 1
+        inf[0]=(winx-viewport[0])/viewport[2]*2.0-1.0;
+        inf[1]=(winy+viewport[1])/viewport[3]*2.0-1.0;
+        inf[2]=2.0*winz-1.0;
+        inf[3]=1.0;
+
+        //Objects coordinates
+        var out = vec4.create();
+        mat4.mulVec4(out, m, inf);
+        if(out[3]==0.0)
+           return null;
+   
+        out[3]=1.0/out[3];
+        return [out[0]*out[3], out[1]*out[3], out[2]*out[3]];
+      }
+    }
+
+    var colorBufferIndex = 4;
+
+    function handleMouseMove(event) 
+    {
+        var newX = event.clientX;
+        var newY = event.clientY;
+
+        if (mouseDown) 
+        {
+            // rotate the polyhedron
+            var deltaX = newX - lastMouseX
+            var newRotationMatrix = mat4.create();
+            mat4.identity(newRotationMatrix);
+            mat4.rotate(newRotationMatrix, newRotationMatrix, degToRad(deltaX / 5), [0, 1, 0]);
+
+            var deltaY = newY - lastMouseY;
+            mat4.rotate(newRotationMatrix, newRotationMatrix, degToRad(deltaY / 5), [1, 0, 0]);
+
+            mat4.multiply(rotationMatrix, newRotationMatrix, rotationMatrix);
+        }
+
+        // collision detection
+        var id = mat4.create();
+        mat4.identity(id);
+
+        // combine mv and p matrices
+        var mat = mat4.create();
+        mat4.multiply(mat, pMatrix, mvMatrix);
+        mat = mvMatrix;
+
+        // get world center of sphere
+        var c = [0.0, 0.0, 0.0, 1.0];
+        var wc = vec4.create();
+        vec4.transformMat4(wc, c, mat); 
+        c = [wc[0], wc[1], wc[2]];  
+        //console.log("Center: "+c);
+
+        // get world point on surface of sphere
+        var s1 = [0.458837, -0.007671, 0.889663, 1.0];
+        var ws1 = vec4.create();
+        vec4.transformMat4(ws1, s1, mat); 
+        s1 = [ws1[0], ws1[1], ws1[2]];  
+
+        var s2 = [-0.949214, 0.311064, -0.072893, 1.0];
+        var ws2 = vec4.create();
+        vec4.transformMat4(ws2, s2, mat); 
+        s2 = [ws2[0], ws2[1], ws2[2]];  
+
+        // get world radius of sphere
+        var vcs1 = vec3.create();
+        vec3.subtract(vcs1, s1, c); 
+        var r1 = vec3.length(vcs1);
+
+        var vcs2 = vec3.create();
+        vec3.subtract(vcs2, s2, c); 
+        var r2 = vec3.length(vcs2);
+
+        var r = r1;
+         
+        // get unprojected mouse ray
+        var p1 = unproject(id, pMatrix, newX, newY, 0);
+        var p2 = unproject(id, pMatrix, newX, newY, 1);
+        var p = p1;
+        var ray = vec3.create();
+        vec3.subtract(ray, p2, p1);
+        var d = vec3.create();
+        vec3.normalize(d, ray);
+        ray = d;
+
+        // vector from p to c
+        var vpc = vec3.create();
+        vec3.subtract(vpc, c, p);
+        var vpc_m = vec3.length(vpc);
+        
+        // distance from vpc to d
+        var loc = vec3.dot(vpc, d);
+
+        // calculate pc: projection of center onto ray (u onto v)
+        var rdc = vec3.dot(ray, c);
+        var pc = vec3.create();
+        vec3.scale(pc, d, rdc);
+
+        // sphere behind origin p
+        if (loc < 0)
+        {
+            console.log("vpc_m: "+vpc_m)
+            if (vpc_m > r)
+                console.log("No intersection");
+            else if (vpc_m == r)
+                console.log("Single intersection");
+            else
+                console.log("Double intersection");
+        }
+        // center of sphere projects on the ray
+        else
+        {
+            var vpcc = vec3.create();
+            vec3.subtract(vpcc, c, pc);
+            //console.log("vpcc len: "+vec3.length(vpcc));
+            if (vec3.length(vpcc) > r)
+            {
+                colorBufferIndex = 4;
+            }
+            else
+            {
+                colorBufferIndex = 2;
+                //check all triangles on polyhedron
+            } 
+        }
+
+        lastMouseX = newX
+        lastMouseY = newY;
+    }
+
+    function drawScene(frameVertexBuffers, frameColorBuffers, 
+            colorBuffers5, colorBuffers6) 
+    {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // perspective matrix
+        mat4.perspective(pMatrix, .785398/*45 d*/, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0);
+
+        // model view matrix
+        mat4.identity(mvMatrix);
+        mat4.translate(mvMatrix, mvMatrix, [-0.0, -0.0, -6.0]);
+        mat4.multiply(mvMatrix, mvMatrix, rotationMatrix);
+
+        mvPushMatrix();
+        //mat4.rotate(mvMatrix, mvMatrix, degToRad(rotation), [0, 1, 0]);
+
+        for (var i = 0; i < faceVertexBuffers.length; i++)
+        {
+            // vertex buffers
+            gl.bindBuffer(gl.ARRAY_BUFFER, faceVertexBuffers[i]);
+            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, faceVertexBuffers[i].itemSize, gl.FLOAT, false, 0, 0);
+
+            // color buffers
+            if (faceVertexBuffers[i].numItems == 5)
+            {
+                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers5[colorBufferIndex]);
+                gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, colorBuffers5[4].itemSize, gl.FLOAT, false, 0, 0);
+            }
+            else if (faceVertexBuffers[i].numItems == 6)
+            {
+                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers6[colorBufferIndex]);
+                gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, colorBuffers6[4].itemSize, gl.FLOAT, false, 0, 0);
+            }
+
+            // draw stuff
+            setMatrixUniforms();
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, faceVertexBuffers[i].numItems);
+        }
+
+        for (var i = 0; i < frameVertexBuffers.length; i++)
+        {
+            // vertex buffers
+            gl.bindBuffer(gl.ARRAY_BUFFER, frameVertexBuffers[i]);
+            gl.vertexAttribPointer(shaderProgram.vertexPositionAttribute, frameVertexBuffers[i].itemSize, gl.FLOAT, false, 0, 0);
+
+            // color buffers
+            if (faceVertexBuffers[i].numItems == 5)
+            {
+                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers5[1]);
+                gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, colorBuffers5[1].itemSize, gl.FLOAT, false, 0, 0);
+            }
+            else if (faceVertexBuffers[i].numItems == 6)
+            {
+                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers6[1]);
+                gl.vertexAttribPointer(shaderProgram.vertexColorAttribute, colorBuffers6[1].itemSize, gl.FLOAT, false, 0, 0);
+            }
+            // draw stuff
+            setMatrixUniforms();
+            gl.drawArrays(gl.LINE_LOOP, 0, frameVertexBuffers[i].numItems);
+        }
+
+        mvPopMatrix();
+    }
+
+
+    var lastTime = 0;
+
+    function animate() {
+        var timeNow = new Date().getTime();
+        if (lastTime != 0) {
+            var elapsed = timeNow - lastTime;
+
+            rotation += (30 * elapsed) / 1000.0;
+        }
+        lastTime = timeNow;
+    }
+
+
+    function tick() 
+    {
+        requestAnimFrame(tick);
+        drawScene(frameVertexBuffers, faceVertexBuffers,
+                colorBuffers5, colorBuffers6);
+        //animate();
+    }
+
+    // vertex and color buffers
+    var frameVertexBuffers = [];
+    var faceVertexBuffers = [];
+    var colorBuffers5 = [];
+    var colorBuffers6 = [];
+
+    // rotation lists
+    var rotation = 0;
+
+    function webGLStart() 
+    {
+        var canvas = document.getElementById("canvas");
+        initGL(canvas);
+        initShaders();
+
+        // init buffers for frame of polyhedron
+        initFrameBuffers(frameVertexBuffers);
+
+        // init buffers for faces of polyhedron
+        initFaceBuffers(faceVertexBuffers);
+
+        // init color buffers for pentagons
+        initColorBuffers5(colorBuffers5);
+
+        // init color buffers for hexagons
+        initColorBuffers6(colorBuffers6);
+
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.enable(gl.DEPTH_TEST);
+
+        canvas.onmousedown = handleMouseDown;
+        document.onmouseup = handleMouseUp;
+        document.onmousemove = handleMouseMove;
+
+        tick();
+    }
+
+</script>
+
+
+</head>
+
+
+<body onload="webGLStart();">
+    <canvas id="canvas" style="border: none;" width="500" height="500"></canvas>
+</body>
+
+</html>
