@@ -1,4 +1,4 @@
-function initFrameBuffers(vertexBuffers)
+function initFrameBuffers(gl, vertexBuffers)
 {
 vertexBuffers.push(gl.createBuffer());
 gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffers[vertexBuffers.length - 1]);
@@ -5569,7 +5569,7 @@ vertexBuffers[vertexBuffers.length - 1].itemSize = 3;
 vertexBuffers[vertexBuffers.length - 1].numItems = 6;
 
 }
-function initFaceBuffers(vertexBuffers)
+function initFaceBuffers(gl, vertexBuffers)
 {
 vertexBuffers.push(gl.createBuffer());
 gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffers[vertexBuffers.length - 1]);
@@ -11140,7 +11140,7 @@ vertexBuffers[vertexBuffers.length - 1].itemSize = 3;
 vertexBuffers[vertexBuffers.length - 1].numItems = 6;
 
 }
-function initColorBuffers5(colorBuffers)
+function initColorBuffers5(gl, colorBuffers)
 {
 colorBuffers.push(gl.createBuffer());
 gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers[colorBuffers.length - 1]);
@@ -11213,7 +11213,7 @@ colorBuffers[colorBuffers.length - 1].itemSize = 4;
 colorBuffers[colorBuffers.length - 1].numItems = 5;
 
 }
-function initColorBuffers6(colorBuffers)
+function initColorBuffers6(gl, colorBuffers)
 {
 colorBuffers.push(gl.createBuffer());
 gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffers[colorBuffers.length - 1]);
