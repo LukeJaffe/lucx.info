@@ -8,6 +8,9 @@
 <script type="text/javascript" src="webgl-utils.js"></script>
 <script type="text/javascript" src="verts.js"></script>
 
+<script type="text/javascript" src="shader.js"></script>
+<script type="text/javascript" src="cursor.js"></script>
+
 <script id="shader-fs" type="x-shader/x-fragment">
     precision mediump float;
 
@@ -35,14 +38,7 @@
     }
 </script>
 
-
 <script type="text/javascript">
-
-    /* Global vertex and color buffers */
-    var frameVertexBuffers = [];
-    var faceVertexBuffers = [];
-    var colorBuffers5 = [];
-    var colorBuffers6 = [];
 
     /* Game class */
     function Game(canvas)
@@ -70,6 +66,9 @@
 
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
         this.gl.enable(this.gl.DEPTH_TEST);
+
+        // keyboard variables
+        this.shift_down = false;
     }
 
     Game.prototype.clear = function()
@@ -88,6 +87,9 @@
     {
         // set model view to identity
         this.clear();
+
+        // apply camera rotation matrix
+
 
         // model view transform
         this.view.world.clear_mv();
@@ -115,112 +117,71 @@
         this.last_mouse_y = event.clientY;
 
         // check to see if any goldbergs are selected
+        var selected = this.view.world.goldberg.selected;
+        if (selected !== -1)
+        {
+            console.log("Selected: "+selected);
+            // zoom in!
+        }
+        else
+        {
+            console.log("NONE SELECTED");
+            // rotate camera around middle axis
+            this.out_mouse_down = true;
+        }
     }
 
     Game.prototype.handle_mouse_up = function(event) 
     {
-        this.mouse_down = false;
+        this.out_mouse_down = false;
     }
 
     Game.prototype.handle_mouse_move = function(event) 
     {
-        var newX = event.clientX;
-        var newY = event.clientY;
+        var new_x = event.clientX;
+        var new_y = event.clientY;
 
-        /*
-        if (mouseDown) 
+        if (this.out_mouse_down)
         {
-            // rotate the polyhedron
-            var deltaX = newX - lastMouseX;
-            var deltaY = newY - lastMouseY;
+            console.log("Rotating...");
+            // rotate the camera around the center point
+            var dx = new_x - this.last_mouse_x;
+            var dy = new_y - this.last_mouse_y;
 
-            var newRotationMatrix = mat4.create();
-            mat4.identity(newRotationMatrix);
+            var rm_new = mat4.create();
+            mat4.identity(rm_new);
 
-            mat4.rotate(newRotationMatrix, newRotationMatrix, degToRad(deltaX / 5), [0, 1, 0]);
-            mat4.rotate(newRotationMatrix, newRotationMatrix, degToRad(deltaY / 5), [1, 0, 0]);
+            mat4.rotate(rm_new, rm_new, degToRad(dx / 5), [0, 1, 0]);
+            mat4.rotate(rm_new, rm_new, degToRad(dy / 5), [1, 0, 0]);
 
-            mat4.multiply(rotationMatrix, newRotationMatrix, rotationMatrix);
+            mat4.multiply(this.view.camera.rm, rm_new, this.view.camera.rm);
         }
-        */
 
-        this.view.collision(newX, newY);
+        // if the shift key is being held, check for collisions
+        if (this.shift_down)
+            this.view.collision(new_x, new_y);
 
-        lastMouseX = newX
-        lastMouseY = newY;
+        this.last_mouse_x = new_x;
+        this.last_mouse_y = new_y;
     }
 
-    /* Shader class */
-    function Shader(gl)
+    Game.prototype.handle_key_down = function(event)
     {
-        var fragmentShader = this.get(gl, "shader-fs");
-        var vertexShader = this.get(gl, "shader-vs");
-
-        this.program = gl.createProgram();
-        gl.attachShader(this.program, vertexShader);
-        gl.attachShader(this.program, fragmentShader);
-        gl.linkProgram(this.program);
-
-        if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) 
+        if (event.shiftKey && !this.shift_down)
         {
-            alert("Could not initialise shaders");
+            this.shift_down = true;
         }
-
-        gl.useProgram(this.program);
-
-        this.program.vertexPositionAttribute = gl.getAttribLocation(this.program, "aVertexPosition");
-        gl.enableVertexAttribArray(this.program.vertexPositionAttribute);
-
-        this.program.vertexColorAttribute = gl.getAttribLocation(this.program, "aVertexColor");
-        gl.enableVertexAttribArray(this.program.vertexColorAttribute);
-
-        this.program.pMatrixUniform = gl.getUniformLocation(this.program, "uPMatrix");
-        this.program.mvMatrixUniform = gl.getUniformLocation(this.program, "uMVMatrix");
     }
 
-    Shader.prototype.get = function(gl, id) 
+    Game.prototype.handle_key_up = function(event)
     {
-        var shaderScript = document.getElementById(id);
-        if (!shaderScript) 
+        if (!event.shiftKey && this.shift_down)
         {
-            return null;
+            this.shift_down = false;
+
+            // clear all selections
+            this.view.clear_selected();
         }
-
-        var str = "";
-        var k = shaderScript.firstChild;
-        while (k) 
-        {
-            if (k.nodeType == 3) 
-            {
-                str += k.textContent;
-            }
-            k = k.nextSibling;
-        }
-
-        var shader;
-        if (shaderScript.type == "x-shader/x-fragment") 
-        {
-            shader = gl.createShader(gl.FRAGMENT_SHADER);
-        } 
-        else if (shaderScript.type == "x-shader/x-vertex") 
-        {
-            shader = gl.createShader(gl.VERTEX_SHADER);
-        } 
-        else 
-        {
-            return null;
-        }
-
-        gl.shaderSource(shader, str);
-        gl.compileShader(shader);
-
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) 
-        {
-            alert(gl.getShaderInfoLog(shader));
-            return null;
-        }
-
-        return shader;
     }
 
     /* View class */
@@ -238,10 +199,15 @@
 
         // cursor
         this.cursor = new Cursor();
+
+        // viewing mode
+        this.mode = 0; // zoomed out
     }
 
     View.prototype.set = function()
     {
+        //var mv = mat4.create();
+        //mat4.multiply(mv, this.camera.rm, this.world.mv);
         this.gl.uniformMatrix4fv(this.shader.program.pMatrixUniform, false, this.camera.p);
         this.gl.uniformMatrix4fv(this.shader.program.mvMatrixUniform, false, this.world.mv);
     }
@@ -264,82 +230,29 @@
             }
         }
 
+        // update selected goldberg
+        this.world.goldberg.selected = -1;
         for (var i = 0; i < this.world.goldberg.num; i++)
         {
             if (i == min_i)
+            {
                 this.world.goldberg.color[i] = 3;
+                this.world.goldberg.selected = i;
+            }
             else
                 this.world.goldberg.color[i] = 1;
         }
     }
 
-    /* Cursor class */
-    function Cursor()
+    View.prototype.clear_selected = function()
     {
-        this.x = 0;
-        this.y = 0;
-        this.p = vec3.create();
-        this.d = vec3.create();
+        this.world.goldberg.selected = -1;
+        for (var i = 0; i < this.world.goldberg.num; i++)
+        {
+            this.world.goldberg.color[i] = 1;
+        }
     }
 
-    Cursor.prototype.unproject = function(mm, pm, winx, winy, winz) 
-    {
-      var canvas = document.getElementById("canvas");
-      // winz is either 0 (near plane), 1 (far plane) or somewhere in between.
-      // if it's not given a value we'll produce coords for both.
-      if (typeof(winz) == "number") 
-      {
-        r = canvas.getBoundingClientRect();
-
-        winx = parseFloat(winx);
-        winy = r.height-parseFloat(winy);
-        winz = parseFloat(winz);
-
-        var inf = vec4.create();
-        var viewport = [r.left, r.top, r.width, r.height];
-
-        //Calculation for inverting a matrix, compute projection x modelview; then compute the inverse
-        var m = mat4.copy(mat4.create(), mm);
-        
-        mat4.invert(m, m); // WHY do I have to do this? --see Jax.Context#reloadMatrices
-        mat4.multiply(m, pm, m);
-        mat4.invert(m, m);
-
-        // Transformation of normalized coordinates between -1 and 1
-        inf[0]=(winx-viewport[0])/viewport[2]*2.0-1.0;
-        inf[1]=(winy+viewport[1])/viewport[3]*2.0-1.0;
-        inf[2]=2.0*winz-1.0;
-        inf[3]=1.0;
-
-        //Objects coordinates
-        var out = vec4.create();
-        mat4.mulVec4(out, m, inf);
-        if(out[3]==0.0)
-           return null;
-   
-        out[3]=1.0/out[3];
-        return [out[0]*out[3], out[1]*out[3], out[2]*out[3]];
-      }
-    }
-
-    Cursor.prototype.update = function(x, y, p_mat)
-    {
-        // update screen x, y
-        this.x = x;
-        this.y = y;
-
-        // make identity mat
-        var id = mat4.create();
-        mat4.identity(id);
-
-        // get unprojected mouse ray
-        var p1 = this.unproject(id, p_mat, this.x, this.y, 0);
-        var p2 = this.unproject(id, p_mat, this.x, this.y, 1);
-        this.p = p1;
-        var ray = vec3.create();
-        vec3.subtract(ray, p2, p1);
-        vec3.normalize(this.d, ray);
-    }
 
     /* Model View class */
     function World(gl, shader)
@@ -351,14 +264,14 @@
         // objects
         this.goldberg = new Goldberg(gl, shader.program.vertexPositionAttribute, shader.program.vertexColorAttribute);
 
-        this.goldberg.add([-2,2,-10], 0);
+        this.goldberg.add([-2,2,-10], 1);
         this.goldberg.add([2,2,-10], 1);
-        this.goldberg.add([-2,-2,-10], 2);
-        this.goldberg.add([2,-2,-10], 3);
-        this.goldberg.add([-2,2,-15], 0);
+        this.goldberg.add([-2,-2,-10], 1);
+        this.goldberg.add([2,-2,-10], 1);
+        this.goldberg.add([-2,2,-15], 1);
         this.goldberg.add([2,2,-15], 1);
-        this.goldberg.add([-2,-2,-15], 2);
-        this.goldberg.add([2,-2,-15], 3);
+        this.goldberg.add([-2,-2,-15], 1);
+        this.goldberg.add([2,-2,-15], 1);
     }
 
     World.prototype.clear_mv = function()
@@ -396,11 +309,19 @@
         this.p = mat4.create();
         mat4.perspective(this.p, .785398, gl.viewport_width/gl.viewport_height, 0.1, 100.0);
 
-        this.r_matrix = mat4.create();
+        // model view matrix
+        this.mv = mat4.create();
+        mat4.identity(this.mv);
+
+        // rotation matrix
+        this.rm = mat4.create();
+        mat4.identity(this.rm);
+
+        // translation vector
         this.t_vec = vec3.create();
     }
 
-    Camera.prototype.set_v = function()
+    Camera.prototype.set_mv = function()
     {
         
     }
@@ -412,6 +333,9 @@
         this.t_vecs = [];
         this.r_mats = [];
         this.color = [];
+
+        // static properties
+        this.selected = -1;
 
         // vertex lists common to all goldbergs
         this.frame_vertices = [];
@@ -589,18 +513,22 @@
         return degrees * Math.PI / 180;
     }
 
-
     function webGLStart() 
     {
         var canvas = document.getElementById("canvas");
         var game = new Game(canvas);
         gl = game.gl;
 
-
+        // program mouse events
         canvas.onmousedown = game.handle_mouse_down.bind(game);
         document.onmouseup = game.handle_mouse_up.bind(game);
         document.onmousemove = game.handle_mouse_move.bind(game);
 
+        // program key events
+        document.onkeydown = game.handle_key_down.bind(game);
+        document.onkeyup = game.handle_key_up.bind(game);
+    
+        // start the game loop
         game.tick();
     }
 
