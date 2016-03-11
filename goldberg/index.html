@@ -85,14 +85,14 @@
 
     Game.prototype.draw = function() 
     {
-        // set model view to identity
+        // clear the viewport
         this.clear();
 
-        // apply camera rotation matrix
-
-
-        // model view transform
+        // set model view to identity
         this.view.world.clear_mv();
+
+        // apply the view matrix to the model matrix
+        mat4.multiply(this.view.world.mv, this.view.world.mv, this.view.camera.vm());
 
         // draw world objects
         for (var i = 0; i < this.view.world.goldberg.num; i++)
@@ -125,7 +125,6 @@
         }
         else
         {
-            console.log("NONE SELECTED");
             // rotate camera around middle axis
             this.out_mouse_down = true;
         }
@@ -143,7 +142,6 @@
 
         if (this.out_mouse_down)
         {
-            console.log("Rotating...");
             // rotate the camera around the center point
             var dx = new_x - this.last_mouse_x;
             var dy = new_y - this.last_mouse_y;
@@ -154,7 +152,9 @@
             mat4.rotate(rm_new, rm_new, degToRad(dx / 5), [0, 1, 0]);
             mat4.rotate(rm_new, rm_new, degToRad(dy / 5), [1, 0, 0]);
 
-            mat4.multiply(this.view.camera.rm, rm_new, this.view.camera.rm);
+            mat4.invert(rm_new, rm_new);
+
+            mat4.multiply(this.view.camera.rm, this.view.camera.rm, rm_new);
         }
 
         // if the shift key is being held, check for collisions
@@ -206,8 +206,6 @@
 
     View.prototype.set = function()
     {
-        //var mv = mat4.create();
-        //mat4.multiply(mv, this.camera.rm, this.world.mv);
         this.gl.uniformMatrix4fv(this.shader.program.pMatrixUniform, false, this.camera.p);
         this.gl.uniformMatrix4fv(this.shader.program.mvMatrixUniform, false, this.world.mv);
     }
@@ -222,7 +220,7 @@
         var min_i = -1;
         for (var i = 0; i < this.world.goldberg.num; i++)
         {
-            d = this.world.goldberg.ray_sphere_collision(i, this.cursor.p, this.cursor.d);
+            d = this.world.goldberg.ray_sphere_collision(i, this.camera.vm(), this.cursor.p, this.cursor.d);
             if (d < min_d)
             {
                 min_d = d;
@@ -264,19 +262,29 @@
         // objects
         this.goldberg = new Goldberg(gl, shader.program.vertexPositionAttribute, shader.program.vertexColorAttribute);
 
-        this.goldberg.add([-2,2,-10], 1);
-        this.goldberg.add([2,2,-10], 1);
-        this.goldberg.add([-2,-2,-10], 1);
-        this.goldberg.add([2,-2,-10], 1);
-        this.goldberg.add([-2,2,-15], 1);
-        this.goldberg.add([2,2,-15], 1);
-        this.goldberg.add([-2,-2,-15], 1);
-        this.goldberg.add([2,-2,-15], 1);
+        this.goldberg.add([-3,3,-3], 1);
+        this.goldberg.add([3,3,-3], 1);
+        this.goldberg.add([-3,-3,-3], 1);
+        this.goldberg.add([3,-3,-3], 1);
+        this.goldberg.add([-3,3,3], 1);
+        this.goldberg.add([3,2,3], 1);
+        this.goldberg.add([-3,-3,3], 1);
+        this.goldberg.add([3,-3,3], 1);
     }
 
     World.prototype.clear_mv = function()
     {
         mat4.identity(this.mv);
+    }
+
+    World.prototype.rotate_mv = function(rm)
+    {
+        mat4.multiply(this.mv, rm, this.mv);
+    }
+
+    World.prototype.translate_mv = function(tv)
+    {
+        mat4.translate(this.mv, this.mv, tv);
     }
 
     World.prototype.set_mv = function(i)
@@ -318,12 +326,17 @@
         mat4.identity(this.rm);
 
         // translation vector
-        this.t_vec = vec3.create();
+        this.tv = [0, 0, 25];
     }
 
-    Camera.prototype.set_mv = function()
+    Camera.prototype.vm = function()
     {
-        
+        var vm = mat4.create();
+        mat4.identity(vm);
+        mat4.multiply(vm, this.rm, vm);
+        mat4.translate(vm, vm, this.tv);
+        mat4.invert(vm, vm);
+        return vm;
     }
 
     /* Goldberg polyhedron class */
@@ -406,16 +419,15 @@
         //mat4.multiply(mv, mv, this.r_mats[i]);
     }
 
-    Goldberg.prototype.ray_sphere_collision = function(i, p, d)
+    Goldberg.prototype.ray_sphere_collision = function(i, vm, p, d)
     {
         // make the model view matrix for this goldberg
-        var mm = mat4.create();
-        this.set_mv(i, mm);
+        this.set_mv(i, vm);
 
         // get world center of sphere
         var c = [0.0, 0.0, 0.0, 1.0];
         var wc = vec4.create();
-        vec4.transformMat4(wc, c, mm); 
+        vec4.transformMat4(wc, c, vm); 
         c = [wc[0], wc[1], wc[2]];  
 
         // radius is about 1.0
