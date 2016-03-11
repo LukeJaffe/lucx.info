@@ -282,6 +282,7 @@
         
         // distance from vpc to d
         var loc = vec3.dot(vpc, d);
+        console.log("center: "+c);
 
         // calculate pc: projection of center onto ray (u onto v)
         var rdc = vec3.dot(ray, c);
@@ -423,16 +424,16 @@
         initShaders();
 
         // init buffers for frame of polyhedron
-        initFrameBuffers(frameVertexBuffers);
+        initFrameBuffers(gl, frameVertexBuffers);
 
         // init buffers for faces of polyhedron
-        initFaceBuffers(faceVertexBuffers);
+        initFaceBuffers(gl, faceVertexBuffers);
 
         // init color buffers for pentagons
-        initColorBuffers5(colorBuffers5);
+        initColorBuffers5(gl, colorBuffers5);
 
         // init color buffers for hexagons
-        initColorBuffers6(colorBuffers6);
+        initColorBuffers6(gl, colorBuffers6);
 
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.enable(gl.DEPTH_TEST);
