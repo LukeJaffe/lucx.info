@@ -69,6 +69,13 @@
 
         // keyboard variables
         this.shift_down = false;
+
+        // camera stuff
+        this.cam_moving = false;
+        this.num_inc = 0;
+        this.num_steps = 100;
+        this.t_start = 25;
+        this.t_inc = 0;
     }
 
     Game.prototype.clear = function()
@@ -80,6 +87,24 @@
     Game.prototype.tick = function() 
     {
         requestAnimFrame(this.tick.bind(this));
+        if (this.cam_moving)
+        {
+            // update rotation position
+            mat4.add(this.view.camera.rm, this.view.camera.rm, this.cam_inc);
+            
+            // update camera z position
+            this.view.camera.tv[2] += this.t_inc;
+
+            // increment until reach start position
+            this.num_inc++;
+
+            //check if done
+            if (this.num_inc == this.num_steps)
+            {
+                this.cam_moving = false;
+                this.num_inc = 0;
+            }
+        }
         this.draw();
     }
 
@@ -165,11 +190,41 @@
         this.last_mouse_y = new_y;
     }
 
+    Game.prototype.handle_mouse_wheel = function(event)
+    {
+        if (event.wheelDelta > 0)
+            this.view.camera.tv[2]--;
+        else
+            this.view.camera.tv[2]++;
+    }
+
     Game.prototype.handle_key_down = function(event)
     {
         if (event.shiftKey && !this.shift_down)
         {
             this.shift_down = true;
+        }
+        if (event.keyCode == 32 && !this.cam_moving)
+        {
+            this.cam_moving = true;
+
+            // get start position
+            var id = mat4.create();
+            mat4.identity(id);
+
+            // get diff between current rotation mat and id
+            var diff = mat4.create();
+            mat4.subtract(diff, id, this.view.camera.rm);
+
+            // get inc mat by dividing by num steps
+            for (var i = 0; i < 16; i++)
+                diff[i] = diff[i]/this.num_steps;
+
+            // get diff between current cam position and default position
+            var tdiff = this.t_start - this.view.camera.tv[2];
+            this.t_inc = tdiff/this.num_steps;
+            
+            this.cam_inc = diff;
         }
     }
 
@@ -535,6 +590,7 @@
         canvas.onmousedown = game.handle_mouse_down.bind(game);
         document.onmouseup = game.handle_mouse_up.bind(game);
         document.onmousemove = game.handle_mouse_move.bind(game);
+        canvas.onmousewheel = game.handle_mouse_wheel.bind(game);
 
         // program key events
         document.onkeydown = game.handle_key_down.bind(game);
