@@ -116,6 +116,7 @@ var User = mongoose.model('User', UserSchema);
 
 /* Process style sheets */
 prep_css("home", "home.css");
+prep_css("catan", "lobby.css");
 
 /* Middleware */
 app.use(function(req, res, next) 
@@ -327,6 +328,98 @@ app.get('/catan/index.html', function (req, res)
     res.sendFile( __dirname + "/catan/" + "index.html" );
 });
 
+app.get('/catan/setup.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/catan/" + "setup.html" );
+});
+
+app.get('/catan/game.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/catan/" + "game.html" );
+});
+
+app.get('/catan/pp_lobby.css', function (req, res) 
+{
+    res.sendFile( __dirname + "/catan/" + "pp_lobby.css" );
+});
+
+
+/******************************
+** Process Goldberg requests **
+******************************/
+
+/* GET requests */
+app.get('/goldberg/index.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/goldberg/" + "index.html" );
+});
+
+app.get('/goldberg/oindex.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/goldberg/" + "oindex.html" );
+});
+
+app.get('/goldberg/verts.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/goldberg/" + "verts.js" );
+});
+
+app.get('/goldberg/shader.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/goldberg/" + "shader.js" );
+});
+
+app.get('/goldberg/cursor.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/goldberg/" + "cursor.js" );
+});
+
+app.get('/goldberg/webgl-utils.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/goldberg/" + "webgl-utils.js" );
+});
+
+app.get('/goldberg/gl-matrix.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/goldberg/" + "gl-matrix.js" );
+});
+
+/***************************
+** Process Chess requests **
+***************************/
+
+/* GET requests */
+app.get('/chess/index.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "index.html" );
+});
+
+app.get('/chess/verts.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "verts.js" );
+});
+
+app.get('/chess/shader.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "shader.js" );
+});
+
+app.get('/chess/cursor.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "cursor.js" );
+});
+
+app.get('/chess/webgl-utils.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "webgl-utils.js" );
+});
+
+app.get('/chess/gl-matrix.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "gl-matrix.js" );
+});
+
+
 /******************
 ** Set up server **
 ******************/
@@ -342,14 +435,17 @@ var server = app.listen(80, function () {
 /* Catan player schema */
 var CatanPlayerSchema = mongoose.Schema(
 {
-    username: String,
+    username: {type: String, required: true, unique: true},
     color: String
 });
+
+var CatanPlayer = mongoose.model('CatanPlayer', CatanPlayerSchema);
 
 /* Catan game schema */
 var CatanGameSchema = mongoose.Schema(
 {
-    host: {type: String, required: true},//, unique: true},
+    host: {type: String, required: true, unique: true},
+    num_players: {type: Number, required: true},
     max_players: {type: Number, required: true},
     started: {type: Boolean, required: true},
     players: [CatanPlayerSchema],
@@ -395,14 +491,18 @@ CatanGameSchema.methods.create = function(socket)
         {
             if (err)
                 if (err.code == 11000)
-                    socket.emit('new_game_failure'); 
+                    socket.emit('new_game_failure', {msg: "This host has already created a game."}); 
                 else
                     console.log(err);
             else
             {
                 console.log("Creating Game"+game.id);
-                // broadcast message to update
+
+                // Broadcast message to update
                 io.sockets.emit('new_game_success');
+
+                // Host automatically joins this game
+                join_game(socket, game.id, game.host);
             }    
         });
     });  
@@ -411,33 +511,107 @@ CatanGameSchema.methods.create = function(socket)
 var CatanGame = mongoose.model('CatanGame', CatanGameSchema);
 
 
+function join_game(socket, id, username)
+{
+    var catan_player = new CatanPlayer(
+    {
+        username: username
+    });
+
+    // Make sure user has not joined any other games
+    CatanGame.find({'players.username': username},
+    function(err, games)
+    {
+        if (games.length < 1)
+        {
+            // Make sure user has not joined this game
+            CatanGame.findOneAndUpdate(
+            {id: id, 'players.username': {$ne: username}}, 
+            {$push: {players: catan_player}, $inc: {num_players: 1}}, 
+            function(err, game)
+            {
+                if (game !== null)
+                {
+                    socket.emit("join_game_success");
+                }
+                else
+                    socket.emit("join_game_failure", {msg: "User has already joined this game."});
+            });
+        }
+        if (games.length == 1)
+        {
+            if (games[0].id == id)
+            {
+                socket.emit("join_game_success");
+            }   
+            else
+            {
+                socket.emit("join_game_failure", {msg: "User has alread joined another game: Game "+games[0].id});
+            }
+        }
+        else if (games.length > 1)
+        {
+            console.log("ERROR: user cannot join multiple games");
+        }
+    });
+}
+
 /* Set up socket.io */
 var io = require('socket.io').listen(server);
 
 /* define interactions with client */
 io.sockets.on('connection', function(socket)
 {
+    // Catan lobby
     socket.on('new_game', function(data)
     {
-        console.log("Starting new game...");
-
-        var catan_game = new CatanGame(
+        // Make sure the host has not joined any other games
+        CatanGame.find({'players.username': data.host},
+        function(err, games)
         {
-            host: data.host,
-            max_players: data.max_players,
-            started: false
+            if (games.length == 0)
+            {
+                console.log("Starting new game...");
+
+                var catan_game = new CatanGame(
+                {
+                    host: data.host,
+                    num_players: 0,
+                    max_players: data.max_players,
+                    started: false
+                });
+
+                catan_game.create(socket);
+            }
+            else
+            {
+                socket.emit('new_game_failure', {msg: "This host has already created a different game: Game "+games[0].id}); 
+            }
         });
-
-        catan_game.create(socket);
-
     });
 
-    // Catan lobby
     socket.on('get_games', function(data)
     {
         CatanGame.find(null, null, {sort: {'id': -1}}, function(err, games)
         {
             socket.emit('game_data', {'games': games});
+        });
+    });
+
+    socket.on('join_game', function(data)
+    {
+        join_game(socket, data.id, data.username);
+    });
+
+    socket.on('get_users', function(data)
+    {
+        console.log("Find game for user: "+data.username);
+        CatanGame.findOne({'players.username': data.username}, function(err, game) 
+        {
+            if (game)
+                socket.emit('user_data', {'users': game.players});
+            else
+                console.log("No matching game found for this user.");
         });
     });
 
