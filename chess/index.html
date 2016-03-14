@@ -381,21 +381,21 @@
 
         for (var i = 0; i < 15; i += 14)
         {
-            this.mesh.add(this.mesh.ROOK, [0, i, 0] , this.mesh.GREEN);
-            this.mesh.add(this.mesh.ROOK, [2*7, i, 0] , this.mesh.GREEN);
-            this.mesh.add(this.mesh.KNIGHT, [0, i, 0] , this.mesh.GREEN);
-            this.mesh.add(this.mesh.KNIGHT, [2*5, i, 0] , this.mesh.GREEN);
-            this.mesh.add(this.mesh.BISHOP, [0, i, 0] , this.mesh.GREEN);
-            this.mesh.add(this.mesh.BISHOP, [2*3, i, 0] , this.mesh.GREEN);
-            this.mesh.add(this.mesh.QUEEN, [0, i, 0] , this.mesh.GREEN);
-            this.mesh.add(this.mesh.KING, [0, i, 0] , this.mesh.GREEN);
+            this.mesh.add(this.mesh.ROOK, [0, i, 0]);
+            this.mesh.add(this.mesh.ROOK, [2*7, i, 0]);
+            this.mesh.add(this.mesh.KNIGHT, [0, i, 0]);
+            this.mesh.add(this.mesh.KNIGHT, [2*5, i, 0]);
+            this.mesh.add(this.mesh.BISHOP, [0, i, 0]);
+            this.mesh.add(this.mesh.BISHOP, [2*3, i, 0]);
+            this.mesh.add(this.mesh.QUEEN, [0, i, 0]);
+            this.mesh.add(this.mesh.KING, [0, i, 0]);
         }
 
         for (var i = 0; i < 8; i++)
-            this.mesh.add(this.mesh.PAWN, [2*i, 0, 0] , this.mesh.GREEN);
+            this.mesh.add(this.mesh.PAWN, [2*i, 0, 0]);
 
         for (var i = 0; i < 8; i++)
-            this.mesh.add(this.mesh.PAWN, [2*i, 10, 0] , this.mesh.GREEN);
+            this.mesh.add(this.mesh.PAWN, [2*i, 10, 0]);
     }
 
     World.prototype.clear_mv = function()
@@ -471,33 +471,29 @@
     {
         // properties unique to each mesh
         this.vert = [];
-        this.t_vecs = [];
         this.color = [];
+        this.t_vecs = [];
 
         // static properties
         this.selected = -1;
 
-        // vertex lists common to all meshs
-        this.pawn_vertices = [];
-        this.rook_vertices = [];
-        this.knight_vertices = [];
-        this.bishop_vertices = [];
-        this.queen_vertices = [];
-        this.king_vertices = [];
-        this.board_vertices = [];
-        this.colors = [];
-
         // init buffers for vertices of each piece type
-        InitPawnVertices(gl, this.pawn_vertices);
-        InitRookVertices(gl, this.rook_vertices);
-        InitKnightVertices(gl, this.knight_vertices);
-        InitBishopVertices(gl, this.bishop_vertices);
-        InitQueenVertices(gl, this.queen_vertices);
-        InitKingVertices(gl, this.king_vertices);
-        InitBoardVertices(gl, this.board_vertices);
+        this.pawn_vertices = InitPawnVertices(gl);
+        this.rook_vertices = InitRookVertices(gl);
+        this.knight_vertices = InitKnightVertices(gl);
+        this.bishop_vertices = InitBishopVertices(gl);
+        this.queen_vertices = InitQueenVertices(gl);
+        this.king_vertices = InitKingVertices(gl);
+        this.board_vertices = InitBoardVertices(gl);
 
         // init color buffers for all triangular meshes
-        InitColors(gl, this.colors);
+        this.pawn_colors = InitPawnColors(gl);
+        this.rook_colors = InitRookColors(gl);
+        this.knight_colors = InitKnightColors(gl);
+        this.bishop_colors = InitBishopColors(gl);
+        this.queen_colors = InitQueenColors(gl);
+        this.king_colors = InitKingColors(gl);
+        this.board_colors = InitBoardColors(gl);
 
         // piece types
         this.PAWN = 0;
@@ -532,36 +528,42 @@
         this.num = 0;
     } 
 
-    Mesh.prototype.add = function(t, p, c)
+    Mesh.prototype.add = function(t, p)
     {
         switch (t)
         {
             case this.PAWN:
                 this.vert.push(this.pawn_vertices);
+                this.color.push(this.pawn_colors);
                 break;
             case this.ROOK:
                 this.vert.push(this.rook_vertices);
+                this.color.push(this.rook_colors);
                 break;
             case this.KNIGHT:
                 this.vert.push(this.knight_vertices);
+                this.color.push(this.knight_colors);
                 break;
             case this.BISHOP:
                 this.vert.push(this.bishop_vertices);
+                this.color.push(this.bishop_colors);
                 break;
             case this.QUEEN:
                 this.vert.push(this.queen_vertices);
+                this.color.push(this.queen_colors);
                 break;
             case this.KING:
                 this.vert.push(this.king_vertices);
+                this.color.push(this.king_colors);
                 break;
             case this.BOARD:
                 this.vert.push(this.board_vertices);
+                this.color.push(this.board_colors);
                 break;
             default:
                 console.log("ERROR: Mesh.prototype.add()\n")
                 break;
         }
-        this.color.push(c);
         this.t_vecs.push(p);
         this.num++;
     }
@@ -725,25 +727,22 @@
 
     Mesh.prototype.draw = function(i)
     {
-        this.draw_verts(this.vert[i], this.TRIANGLES, this.IVORY); 
+        this.draw_verts(this.vert[i], this.TRIANGLES, this.color[i]); 
         //this.draw_verts(this.vert[i], this.LINE_LOOP, this.color[i]); 
     }
 
     Mesh.prototype.draw_verts = function(vertices, method, color)
     {
-        for (var i = 0; i < vertices.length; i++)
-        {
-            // vertex buffers
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertices[i]);
-            gl.vertexAttribPointer(this.vpa, vertices[i].itemSize, gl.FLOAT, false, 0, 0);
+        // vertex buffers
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
+        gl.vertexAttribPointer(this.vpa, vertices.itemSize, gl.FLOAT, false, 0, 0);
 
-            // color buffers
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.colors[color]);
-            gl.vertexAttribPointer(this.vca, this.colors[color].itemSize, gl.FLOAT, false, 0, 0);
+        // color buffers
+        gl.bindBuffer(gl.ARRAY_BUFFER, color);
+        gl.vertexAttribPointer(this.vca, color.itemSize, gl.FLOAT, false, 0, 0);
 
-            // draw stuff
-            gl.drawArrays(method, 0, vertices[i].numItems);
-        }
+        // draw stuff
+        gl.drawArrays(method, 0, vertices.numItems);
     }
 
     function degToRad(degrees) 

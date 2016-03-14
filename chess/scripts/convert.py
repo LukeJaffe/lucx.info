@@ -17,34 +17,43 @@ pieces = [
 {"mesh":bishop_mesh, "name":"Bishop"},
 {"mesh":queen_mesh, "name":"Queen"},
 {"mesh":king_mesh, "name":"King"},
+{"mesh":board_mesh, "name":"Board"}
 ]
 
-"""
-for piece in pieces:
-    mesh = piece["mesh"]
-    mesh.z -= np.min(mesh.z)
-
-board_mesh.z -= np.max(board_mesh.z)
-"""
-
-pieces.append({"mesh":board_mesh, "name":"Board"})
 
 def write_vertices(out, mesh, name):
     # Write vertex buffers
-    out.write("function Init%sVertices(gl, buffers)\n{\n" % name)
+    out.write("function Init%sVertices(gl)\n{\n" % name)
+    out.write("var buffer = gl.createBuffer();\n")
+    out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffer);\n")
+    out.write("var vertices =\n") 
+    out.write("[\n")
     for triangle in mesh.points:
-        out.write("buffers.push(gl.createBuffer());\n")
-        out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffers[buffers.length - 1]);\n")
-        out.write("var vertices =\n") 
-        out.write("[\n")
         for c in triangle:  
             out.write("%f,\n" % c)
-        out.write("];\n")
-        out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
-        out.write("buffers[buffers.length - 1].itemSize = 3;\n");
-        out.write("buffers[buffers.length - 1].numItems = 3;\n\n");
+    out.write("];\n")
+    out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
+    out.write("buffer.itemSize = 3;\n");
+    out.write("buffer.numItems = %d;\n\n" % (len(mesh.points)*3));
+    out.write("return buffer;\n") 
     out.write("}\n");
 
+def write_colors(out, mesh, name, c):
+    # Write color buffers
+    out.write("function Init%sColors(gl)\n{\n" % name)
+    out.write("var buffer = gl.createBuffer();\n")
+    out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffer);\n")
+    out.write("var vertices =\n") 
+    out.write("[\n")
+    for triangle in mesh.points:
+        for i in range(3):  
+            out.write("%f, %f, %f, %f,\n" % c)
+    out.write("];\n")
+    out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
+    out.write("buffer.itemSize = 4;\n");
+    out.write("buffer.numItems = %d;\n\n" % (len(mesh.points)*3));
+    out.write("return buffer;\n") 
+    out.write("}\n");
 
 def write_triangles(out, mesh, name):
     out.write("function Init%sTriangles(triangles)\n{\n" % name)
@@ -60,18 +69,6 @@ def write_triangles(out, mesh, name):
         out.write("triangles[i].push([%f, %f, %f]);\n" % p3)
     out.write("}\n");
 
-def write_face_colors(out, n, c):
-    out.write("buffers.push(gl.createBuffer());\n")
-    out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffers[buffers.length - 1]);\n")
-    out.write("var colors =\n") 
-    out.write("[\n")
-    for i in range(n):  
-        out.write("%f, %f, %f, %f,\n" % c)
-    out.write("];\n")
-    out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);\n")
-    out.write("buffers[buffers.length - 1].itemSize = 4;\n");
-    out.write("buffers[buffers.length - 1].numItems = %d;\n\n" % n);
-
 colors = [
 (1.0, 0.0, 0.0, 1.0),
 (0.0, 1.0, 0.0, 1.0),
@@ -82,14 +79,12 @@ colors = [
 ]
 
 # Create the javascript initBuffers() function, write it to a file
-out = open("../js/verts.js", "wb")
+out = open("/home/jaffe5/Projects/web/chess/verts.js", "wb")
 
 # Write vertex function for each piece
 for piece in pieces:
     write_vertices(out, piece["mesh"], piece["name"])
 
 # Write color buffers
-out.write("function InitColors(gl, buffers)\n{\n")
-for c in colors:
-    write_face_colors(out, 3, c)
-out.write("}\n");
+for piece in pieces:
+    write_colors(out, piece["mesh"], piece["name"], (1.0, 1.0, .941, 0.0))
