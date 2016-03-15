@@ -15,28 +15,52 @@
     precision mediump float;
 
     varying vec4 vColor;
+    varying vec3 vLightWeighting;
 
     void main(void) 
     {
-        gl_FragColor = vColor;
+        gl_FragColor = vec4(vColor.rgb * vLightWeighting, vColor.a);
     }
 </script>
 
 <script id="shader-vs" type="x-shader/x-vertex">
     attribute vec3 aVertexPosition;
+    attribute vec3 aVertexNormal;
     attribute vec4 aVertexColor;
 
     uniform mat4 uMVMatrix;
     uniform mat4 uPMatrix;
+    uniform mat3 uNMatrix;
+
+    uniform vec3 uAmbientColor;
+
+    uniform vec3 uLightingDirection;
+    uniform vec3 uDirectionalColor;
+
+    uniform bool uUseLighting;
 
     varying vec4 vColor;
+    varying vec3 vLightWeighting;
 
     void main(void) 
     {
         gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
         vColor = aVertexColor;
+
+        if (!uUseLighting) 
+        {
+            vLightWeighting = vec3(1.0, 1.0, 1.0);
+        } 
+        else 
+        {
+            vec3 transformedNormal = uNMatrix * aVertexNormal;
+            float directionalLightWeighting = 
+                max(dot(transformedNormal, uLightingDirection), 0.0);
+            vLightWeighting = uAmbientColor + uDirectionalColor * directionalLightWeighting;
+        }
     }
 </script>
+
 
 <script type="text/javascript">
 
@@ -77,7 +101,7 @@
         this.cam_moving = false;
         this.num_inc = 0;
         this.num_steps = 100;
-        this.t_start = [0, 0, 25];
+        this.t_start = [0, 2, 30];
         this.t_zoom = [0, 0, 4];
         this.t_inc = vec3.create();
     }
@@ -200,8 +224,8 @@
             var rm_new = mat4.create();
             mat4.identity(rm_new);
 
-            mat4.rotate(rm_new, rm_new, degToRad(dx / 5), [0, 1, 0]);
-            mat4.rotate(rm_new, rm_new, degToRad(dy / 5), [1, 0, 0]);
+            mat4.rotate(rm_new, rm_new, degToRad(dx / 5), [0, 0, 1]);
+            //mat4.rotate(rm_new, rm_new, degToRad(dy / 5), [1, 1, 0]);
 
             mat4.invert(rm_new, rm_new);
 
@@ -209,6 +233,7 @@
         }
 
         //this.view.face_collision(new_x, new_y);
+        this.view.board_collision(new_x, new_y);
 
         this.last_mouse_x = new_x;
         this.last_mouse_y = new_y;
@@ -237,12 +262,13 @@
             this.cam_moving = true;
 
             // get start position
-            var id = mat4.create();
-            mat4.identity(id);
+            var rm = mat4.create();
+            mat4.identity(rm);
+            mat4.rotate(rm, rm, degToRad(45), [1, 0, 0]); 
 
             // get diff between current rotation mat and id
             var diff = mat4.create();
-            mat4.subtract(diff, id, this.view.camera.rm);
+            mat4.subtract(diff, rm, this.view.camera.rm);
 
             // get inc mat by dividing by num steps
             for (var i = 0; i < 16; i++)
@@ -277,6 +303,9 @@
         // world
         this.world = new World(this.gl, this.shader);
 
+        // game board
+        this.board = new Board();
+
         // camera
         this.camera = new Camera(this.gl);
 
@@ -291,7 +320,23 @@
     {
         this.gl.uniformMatrix4fv(this.shader.program.pMatrixUniform, false, this.camera.p);
         this.gl.uniformMatrix4fv(this.shader.program.mvMatrixUniform, false, this.world.mv);
+
+        var normalMatrix = mat3.create();
+        mat4.toInverseMat3(this.world.mv, normalMatrix);
+        mat3.transpose(normalMatrix, normalMatrix);
+        this.gl.uniformMatrix3fv(this.shader.program.nMatrixUniform, false, normalMatrix);
     }
+
+    View.prototype.board_collision = function(x, y)
+    {
+        // update cursor
+        this.cursor.update(x, y, this.camera.p);
+
+        // test for collision with all tiles
+        var i = this.board.collision(this.camera.vm(), this.cursor.p, this.cursor.d)
+        console.log(i);
+    }
+    
 
     View.prototype.sphere_collision = function(x, y)
     {
@@ -375,27 +420,31 @@
         this.mv = mat4.create();
 
         // objects
-        this.mesh = new Mesh(gl, shader.program.vertexPositionAttribute, shader.program.vertexColorAttribute);
+        this.mesh = new Mesh(gl, 
+            shader.program.vertexPositionAttribute,
+            shader.program.vertexNormalAttribute,
+            shader.program.vertexColorAttribute,
+            shader.program);
 
-        this.mesh.add(this.mesh.BOARD, [0, 0, 0] , this.mesh.GREEN);
+        this.mesh.add(this.mesh.BOARD, [0, 0, 0], 0, this.mesh.WHITE);
 
-        for (var i = 0; i < 15; i += 14)
+        for (var i = 0; i < 2; i++)
         {
-            this.mesh.add(this.mesh.ROOK, [0, i, 0]);
-            this.mesh.add(this.mesh.ROOK, [2*7, i, 0]);
-            this.mesh.add(this.mesh.KNIGHT, [0, i, 0]);
-            this.mesh.add(this.mesh.KNIGHT, [2*5, i, 0]);
-            this.mesh.add(this.mesh.BISHOP, [0, i, 0]);
-            this.mesh.add(this.mesh.BISHOP, [2*3, i, 0]);
-            this.mesh.add(this.mesh.QUEEN, [0, i, 0]);
-            this.mesh.add(this.mesh.KING, [0, i, 0]);
+            this.mesh.add(this.mesh.ROOK, [0, 14*i, 0], 0, i);
+            this.mesh.add(this.mesh.ROOK, [2*7, 14*i, 0], 0, i);
+            this.mesh.add(this.mesh.KNIGHT, [0, 14*i, 0], i, i);
+            this.mesh.add(this.mesh.KNIGHT, [2*5, 14*i, 0], i, i);
+            this.mesh.add(this.mesh.BISHOP, [0, 14*i, 0], i, i);
+            this.mesh.add(this.mesh.BISHOP, [2*3, 14*i, 0], i, i);
+            this.mesh.add(this.mesh.QUEEN, [0, 14*i, 0], 0, i);
+            this.mesh.add(this.mesh.KING, [0, 14*i, 0], 0, i);
         }
 
         for (var i = 0; i < 8; i++)
-            this.mesh.add(this.mesh.PAWN, [2*i, 0, 0]);
+            this.mesh.add(this.mesh.PAWN, [2*i, 0, 0], 0, this.mesh.WHITE);
 
         for (var i = 0; i < 8; i++)
-            this.mesh.add(this.mesh.PAWN, [2*i, 10, 0]);
+            this.mesh.add(this.mesh.PAWN, [2*i, 10, 0], 0, this.mesh.BLACK);
     }
 
     World.prototype.clear_mv = function()
@@ -450,10 +499,10 @@
         // rotation matrix
         this.rm = mat4.create();
         mat4.identity(this.rm);
-        this.rm = [1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1];
+        mat4.rotate(this.rm, this.rm, degToRad(45), [1, 0, 0]); 
 
         // translation vector
-        this.tv = [0, 5, 25];
+        this.tv = [0, 2, 30];
     }
 
     Camera.prototype.vm = function()
@@ -466,13 +515,101 @@
         return vm;
     }
 
-    /* Triangle mesh class */
-    function Mesh(gl, vpa, vca)
+    function Board()
     {
+        this.centers = [];
+        for (var i = 1; i < 16; i += 2)
+            for (var j = 1; j < 16; j += 2)
+                this.centers.push([i-8,j-8,0,1]);
+    }
+
+    Board.prototype.collision = function(vm, p, d)
+    {
+        var min_d = Infinity, min_i = -1;
+        for (var i = 0; i < this.centers.length; i++)
+        {
+            // get world center of sphere
+            var wc = vec4.create();
+            vec4.transformMat4(wc, this.centers[i], vm); 
+            var c = [wc[0], wc[1], wc[2]];  
+
+            // radius is exactly 1.0
+            var r = 1.0;
+
+            // vector from p to c
+            var vpc = vec3.create();
+            vec3.subtract(vpc, c, p);
+            var vpc_m = vec3.length(vpc);
+            
+            // distance from vpc to d
+            var loc = vec3.dot(vpc, d);
+
+            // calculate pc: projection of center onto ray (u onto v)
+            var rdc = vec3.dot(d, c);
+            var pc = vec3.create();
+            vec3.scale(pc, d, rdc);
+
+            // sphere behind origin p
+            if (loc < 0)
+            {
+                if (vpc_m > r)
+                    console.log("No intersection");
+                else if (vpc_m == r)
+                    console.log("Single intersection");
+                else
+                    console.log("Double intersection");
+            }
+            // center of sphere projects on the ray
+            else
+            {
+                var vpcc = vec3.create();
+                vec3.subtract(vpcc, c, pc);
+                if (vec3.length(vpcc) > r)
+                {
+                    //return Infinity;
+                }
+                else
+                {
+                    // get the distance from pc to the first intersection point
+                    var pcc = vec3.create();
+                    vec3.subtract(pcc, pc, c);
+                    var pcc_len = vec3.length(pcc);
+                    var dist = Math.sqrt(r*r - pcc_len*pcc_len)
+
+                    // get the distance from p to the first intersection point
+                    var pcp = vec3.create();
+                    vec3.subtract(pcp, pc, p);
+                    if (vpc_m > r)
+                    {
+                        d = vec3.length(pcp) - dist;
+                    }
+                    else
+                    {
+                        d = vec3.length(pcp) + dist;
+                    }
+                    if (d < min_d)
+                    {
+                        min_d = d;
+                        min_i = i;
+                    }
+                } 
+            }
+        }
+        return min_i;
+    }
+
+    /* Triangle mesh class */
+    function Mesh(gl, vpa, vna, vca, program)
+    {
+        //
+        this.program = program;
+    
         // properties unique to each mesh
         this.vert = [];
         this.color = [];
-        this.t_vecs = [];
+        this.normal = [];
+        this.translation = [];
+        this.flip = [];
 
         // static properties
         this.selected = -1;
@@ -486,14 +623,34 @@
         this.king_vertices = InitKingVertices(gl);
         this.board_vertices = InitBoardVertices(gl);
 
-        // init color buffers for all triangular meshes
-        this.pawn_colors = InitPawnColors(gl);
-        this.rook_colors = InitRookColors(gl);
-        this.knight_colors = InitKnightColors(gl);
-        this.bishop_colors = InitBishopColors(gl);
-        this.queen_colors = InitQueenColors(gl);
-        this.king_colors = InitKingColors(gl);
-        this.board_colors = InitBoardColors(gl);
+        // init color buffers for each piece type
+        this.pawn_colors = [];
+        this.rook_colors = [];
+        this.knight_colors = [];
+        this.bishop_colors = [];
+        this.queen_colors = [];
+        this.king_colors = [];
+        this.board_colors = [];
+
+        for (var i = 0; i < 2; i++)
+        {
+            this.pawn_colors.push(InitPawnColors(gl, i));
+            this.rook_colors.push(InitRookColors(gl, i));
+            this.knight_colors.push(InitKnightColors(gl, i));
+            this.bishop_colors.push(InitBishopColors(gl, i));
+            this.queen_colors.push(InitQueenColors(gl, i));
+            this.king_colors.push(InitKingColors(gl, i));
+            this.board_colors.push(InitBoardColors(gl, i));
+        }
+
+        // init normal buffers for each piece type
+        this.pawn_normals = InitPawnNormals(gl);
+        this.rook_normals = InitRookNormals(gl);
+        this.knight_normals = InitKnightNormals(gl);
+        this.bishop_normals = InitBishopNormals(gl);
+        this.queen_normals = InitQueenNormals(gl);
+        this.king_normals = InitKingNormals(gl);
+        this.board_normals = InitBoardNormals(gl);
 
         // piece types
         this.PAWN = 0;
@@ -510,6 +667,7 @@
 
         // vertex attributes
         this.vpa = vpa;
+        this.vna = vna;
         this.vca = vca; 
 
         // drawing methods
@@ -517,60 +675,64 @@
         this.LINE_LOOP = gl.LINE_LOOP;
 
         // colors
-        this.RED = 0;
-        this.GREEN = 1;
-        this.BLUE = 2;
-        this.WHITE = 3;
-        this.BLACK = 4;
-        this.IVORY = 5;
+        this.WHITE = 0;
+        this.BLACK = 1;
 
         // number of meshs
         this.num = 0;
     } 
 
-    Mesh.prototype.add = function(t, p)
+    Mesh.prototype.add = function(t, p, f, c)
     {
         switch (t)
         {
             case this.PAWN:
                 this.vert.push(this.pawn_vertices);
-                this.color.push(this.pawn_colors);
+                this.color.push(this.pawn_colors[c]);
+                this.normal.push(this.pawn_normals);
                 break;
             case this.ROOK:
                 this.vert.push(this.rook_vertices);
-                this.color.push(this.rook_colors);
+                this.color.push(this.rook_colors[c]);
+                this.normal.push(this.rook_normals);
                 break;
             case this.KNIGHT:
                 this.vert.push(this.knight_vertices);
-                this.color.push(this.knight_colors);
+                this.color.push(this.knight_colors[c]);
+                this.normal.push(this.knight_normals);
                 break;
             case this.BISHOP:
                 this.vert.push(this.bishop_vertices);
-                this.color.push(this.bishop_colors);
+                this.color.push(this.bishop_colors[c]);
+                this.normal.push(this.bishop_normals);
                 break;
             case this.QUEEN:
                 this.vert.push(this.queen_vertices);
-                this.color.push(this.queen_colors);
+                this.color.push(this.queen_colors[c]);
+                this.normal.push(this.queen_normals);
                 break;
             case this.KING:
                 this.vert.push(this.king_vertices);
-                this.color.push(this.king_colors);
+                this.color.push(this.king_colors[c]);
+                this.normal.push(this.king_normals);
                 break;
             case this.BOARD:
                 this.vert.push(this.board_vertices);
-                this.color.push(this.board_colors);
+                this.color.push(this.board_colors[c]);
+                this.normal.push(this.board_normals);
                 break;
             default:
                 console.log("ERROR: Mesh.prototype.add()\n")
                 break;
         }
-        this.t_vecs.push(p);
+        this.translation.push(p);
+        this.flip.push(f);
         this.num++;
     }
 
     Mesh.prototype.set_t = function(i, t)
     {
-        this.t_vecs[i] = t;
+        this.translation[i] = t;
     }
 
     Mesh.prototype.update_r = function(i, r)
@@ -585,7 +747,12 @@
 
     Mesh.prototype.set_mv = function(i, mv)
     {
-        mat4.translate(mv, mv, this.t_vecs[i]);
+        if (this.flip[i])
+        {
+            mat4.translate(mv, mv, [0,14,0]);
+            mat4.rotate(mv, mv, degToRad(180), [0,0,1]);
+        }
+        mat4.translate(mv, mv, this.translation[i]);
     }
 
     Mesh.prototype.ray_sphere_collision = function(i, vm, p, d)
@@ -727,19 +894,53 @@
 
     Mesh.prototype.draw = function(i)
     {
-        this.draw_verts(this.vert[i], this.TRIANGLES, this.color[i]); 
+        this.draw_verts(this.vert[i], this.normal[i], this.color[i], this.TRIANGLES); 
         //this.draw_verts(this.vert[i], this.LINE_LOOP, this.color[i]); 
     }
 
-    Mesh.prototype.draw_verts = function(vertices, method, color)
+    Mesh.prototype.draw_verts = function(vertices, normals, colors, method)
     {
         // vertex buffers
         gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
         gl.vertexAttribPointer(this.vpa, vertices.itemSize, gl.FLOAT, false, 0, 0);
 
+        // normal buffers
+        gl.bindBuffer(gl.ARRAY_BUFFER, normals);
+        gl.vertexAttribPointer(this.vna, normals.itemSize, gl.FLOAT, false, 0, 0);
+
         // color buffers
-        gl.bindBuffer(gl.ARRAY_BUFFER, color);
-        gl.vertexAttribPointer(this.vca, color.itemSize, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, colors);
+        gl.vertexAttribPointer(this.vca, colors.itemSize, gl.FLOAT, false, 0, 0);
+
+        // lighting
+        var lighting = document.getElementById("lighting").checked;
+        gl.uniform1i(this.program.useLightingUniform, lighting);
+        if (lighting) 
+        {
+            gl.uniform3f(
+                this.program.ambientColorUniform,
+                parseFloat(document.getElementById("ambientR").value),
+                parseFloat(document.getElementById("ambientG").value),
+                parseFloat(document.getElementById("ambientB").value)
+            );
+
+            var lightingDirection = [
+                parseFloat(document.getElementById("lightDirectionX").value),
+                parseFloat(document.getElementById("lightDirectionY").value),
+                parseFloat(document.getElementById("lightDirectionZ").value)
+            ];
+            var adjustedLD = vec3.create();
+            vec3.normalize(adjustedLD, lightingDirection);
+            vec3.scale(adjustedLD, adjustedLD, -1);
+            gl.uniform3fv(this.program.lightingDirectionUniform, adjustedLD);
+
+            gl.uniform3f(
+                this.program.directionalColorUniform,
+                parseFloat(document.getElementById("directionalR").value),
+                parseFloat(document.getElementById("directionalG").value),
+                parseFloat(document.getElementById("directionalB").value)
+            );
+        }
 
         // draw stuff
         gl.drawArrays(method, 0, vertices.numItems);
@@ -778,6 +979,38 @@
 
 <body onload="webGLStart();">
     <canvas id="canvas" style="border: none;" width="500" height="500"></canvas>
+
+    <br />
+    <input type="checkbox" id="lighting" checked /> Use lighting<br/>
+
+    <br/>
+    <h2>Directional light:</h2>
+
+    <table style="border: 0; padding: 10px;">
+        <tr>
+            <td><b>Direction:</b>
+            <td>X: <input type="text" id="lightDirectionX" value="-0.25" />
+            <td>Y: <input type="text" id="lightDirectionY" value="-0.25" />
+            <td>Z: <input type="text" id="lightDirectionZ" value="-1.0" />
+        </tr>
+        <tr>
+            <td><b>Colour:</b>
+            <td>R: <input type="text" id="directionalR" value="0.8" />
+            <td>G: <input type="text" id="directionalG" value="0.8" />
+            <td>B: <input type="text" id="directionalB" value="0.8" />
+        </tr>
+    </table>
+
+    <h2>Ambient light:</h2>
+    <table style="border: 0; padding: 10px;">
+        <tr>
+            <td><b>Colour:</b>
+            <td>R: <input type="text" id="ambientR" value="0.5" />
+            <td>G: <input type="text" id="ambientG" value="0.5" />
+            <td>B: <input type="text" id="ambientB" value="0.5" />
+        </tr>
+    </table>
 </body>
+
 
 </html>

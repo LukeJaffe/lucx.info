@@ -20,6 +20,14 @@ pieces = [
 {"mesh":board_mesh, "name":"Board"}
 ]
 
+colors = [
+(0.910, 0.800, 0.620, 1.0),
+(0.294, 0.176, 0.082, 1.0)
+]
+
+TILE_WIDTH = 2;
+NUM_X = 8;
+NUM_Y = 8;
 
 def write_vertices(out, mesh, name):
     # Write vertex buffers
@@ -30,7 +38,7 @@ def write_vertices(out, mesh, name):
     out.write("[\n")
     for triangle in mesh.points:
         for c in triangle:  
-            out.write("%f,\n" % c)
+            out.write("%f," % c)
     out.write("];\n")
     out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
     out.write("buffer.itemSize = 3;\n");
@@ -38,19 +46,52 @@ def write_vertices(out, mesh, name):
     out.write("return buffer;\n") 
     out.write("}\n");
 
-def write_colors(out, mesh, name, c):
+def write_colors(out, mesh, name, colors):
     # Write color buffers
-    out.write("function Init%sColors(gl)\n{\n" % name)
+    out.write("function Init%sColors(gl, c)\n{\n" % name)
+    out.write("var buffer = gl.createBuffer();\n")
+    out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffer);\n")
+    out.write("var vertices = [];\n") 
+    out.write("switch (c)\n{\n")
+    for i,color in enumerate(colors):
+        out.write("case %d:\n" % i)
+        out.write("vertices =\n") 
+        out.write("[\n")
+        if name == "Board":
+            for j in range(0, len(mesh.points), 12):
+                for k in range(j,j+12):
+                    for t in range(3):  
+                        if j%24 == 0:
+                            out.write("%f, %f, %f, %f," % colors[0])
+                        else:
+                            out.write("%f, %f, %f, %f," % colors[1])
+        else:
+            for j,triangle in enumerate(mesh.points):
+                for i in range(3):  
+                    out.write("%f, %f, %f, %f," % color)
+        out.write("];\n")
+        out.write("break;\n")
+    out.write("default: break; }\n")
+    out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
+    out.write("buffer.itemSize = 4;\n");
+    out.write("buffer.numItems = %d;\n\n" % (len(mesh.points)*3));
+    out.write("return buffer;\n") 
+    out.write("}\n");
+
+def write_normals(out, mesh, name):
+    # Write vertex buffers
+    out.write("function Init%sNormals(gl)\n{\n" % name)
     out.write("var buffer = gl.createBuffer();\n")
     out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffer);\n")
     out.write("var vertices =\n") 
     out.write("[\n")
-    for triangle in mesh.points:
+    for normal in mesh.normals:
+        normal /= np.linalg.norm(normal)
         for i in range(3):  
-            out.write("%f, %f, %f, %f,\n" % c)
+            out.write("%f, %f, %f," % tuple(normal))
     out.write("];\n")
     out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
-    out.write("buffer.itemSize = 4;\n");
+    out.write("buffer.itemSize = 3;\n");
     out.write("buffer.numItems = %d;\n\n" % (len(mesh.points)*3));
     out.write("return buffer;\n") 
     out.write("}\n");
@@ -69,15 +110,6 @@ def write_triangles(out, mesh, name):
         out.write("triangles[i].push([%f, %f, %f]);\n" % p3)
     out.write("}\n");
 
-colors = [
-(1.0, 0.0, 0.0, 1.0),
-(0.0, 1.0, 0.0, 1.0),
-(0.0, 0.0, 1.0, 1.0),
-(1.0, 1.0, 1.0, 1.0),
-(0.0, 0.0, 0.0, 1.0),
-(1.0, 1.0, .941, 0.0)
-]
-
 # Create the javascript initBuffers() function, write it to a file
 out = open("/home/jaffe5/Projects/web/chess/verts.js", "wb")
 
@@ -85,6 +117,10 @@ out = open("/home/jaffe5/Projects/web/chess/verts.js", "wb")
 for piece in pieces:
     write_vertices(out, piece["mesh"], piece["name"])
 
+# Write vertex function for each piece
+for piece in pieces:
+    write_normals(out, piece["mesh"], piece["name"])
+
 # Write color buffers
 for piece in pieces:
-    write_colors(out, piece["mesh"], piece["name"], (1.0, 1.0, .941, 0.0))
+    write_colors(out, piece["mesh"], piece["name"], colors)
