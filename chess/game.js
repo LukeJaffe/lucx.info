@@ -27,6 +27,7 @@ function Game(canvas)
     this.last_mouse_y = null;
     this.out_mouse_down = false;
     this.in_mouse_down = false;
+    this.selected = false;
 
     // keyboard variables
     this.shift_down = false;
@@ -81,6 +82,9 @@ Game.prototype.draw = function()
     // apply the view matrix to the model matrix
     mat4.multiply(this.view.world.mv, this.view.world.mv, this.view.camera.vm());
 
+    // draw the board
+    this.view.board.draw(this.shader);
+
     // draw world objects
     for (var i = 0; i < this.view.world.mesh.num; i++)
     {
@@ -91,7 +95,7 @@ Game.prototype.draw = function()
         // set the shader matrices
         this.view.set();
         // draw the mesh
-        this.view.world.mesh.draw(i);
+        this.view.world.mesh.draw(this.shader, i);
         // pop the top mv matrix off the stack
         this.view.world.pop_mv();
     }
@@ -102,46 +106,26 @@ Game.prototype.handle_mouse_down = function(event)
     this.last_mouse_x = event.clientX;
     this.last_mouse_y = event.clientY;
 
+    this.mouse_down = true;
+
     // check to see if any meshs are selected
     var selected = this.view.world.mesh.selected;
-    if (selected !== -1 && !this.cam_moving)
+    if (selected !== -1)
     {
-        console.log("Selected: "+selected);
-        // zoom in to a mesh
-        this.zoom = true;
-
-        // start moving camera
-        this.cam_moving = true;
-
-        // get target position
-        var pt = mat4.create();
-        mat4.identity(pt);
-        this.view.world.mesh.set_mv(selected, pt);
-
-        // get diff between current rotation mat and id
-        var diff = mat4.create();
-        mat4.subtract(diff, pt, this.view.camera.rm);
-
-        // get inc mat by dividing by num steps
-        for (var i = 0; i < 16; i++)
-            diff[i] = diff[i]/this.num_steps;
-        this.cam_inc = diff;
-
-        // get diff between current cam position and default position
-        var tdiff = vec3.create();
-        vec3.subtract(tdiff, this.t_zoom, this.view.camera.tv);
-        vec3.scale(this.t_inc, tdiff, 1.0/this.num_steps);
+        if (this.view.world.mesh.team[selected] == this.view.world.mesh.WHITE)
+            this.view.world.mesh.color[selected] = this.view.world.mesh.WHITE_SELECTED;
+        else
+            this.view.world.mesh.color[selected] = this.view.world.mesh.BLACK_SELECTED;
+        this.selected = true;
     }
     else
     {
-        // rotate camera around middle axis
-        this.out_mouse_down = true;
     }
 }
 
 Game.prototype.handle_mouse_up = function(event) 
 {
-    this.out_mouse_down = false;
+    this.mouse_down = false;
 }
 
 Game.prototype.handle_mouse_move = function(event) 
@@ -149,7 +133,7 @@ Game.prototype.handle_mouse_move = function(event)
     var new_x = event.clientX;
     var new_y = event.clientY;
 
-    if (this.out_mouse_down)
+    if (this.mouse_down)
     {
         // rotate the camera around the center point
         var dx = new_x - this.last_mouse_x;
@@ -166,7 +150,9 @@ Game.prototype.handle_mouse_move = function(event)
         mat4.multiply(this.view.camera.rm, this.view.camera.rm, rm_new);
     }
 
-    //this.view.face_collision(new_x, new_y);
+    // Check for mouse collisions with the board
+    //if (!this.selected)
+    //    this.view.piece_collision(new_x, new_y);
     this.view.board_collision(new_x, new_y);
 
     this.last_mouse_x = new_x;
@@ -238,7 +224,7 @@ function View(gl, shader)
     this.world = new World(this.gl, this.shader);
 
     // game board
-    this.board = new Board();
+    this.board = new Board(this.gl);
 
     // camera
     this.camera = new Camera(this.gl);
@@ -267,8 +253,19 @@ View.prototype.board_collision = function(x, y)
     this.cursor.update(x, y, this.camera.p);
 
     // test for collision with all tiles
+    var s = this.board.collision(this.camera.vm(), this.cursor.p, this.cursor.d)
+    this.board.selected = s;
+}
+
+View.prototype.piece_collision = function(x, y)
+{
+    // update cursor
+    this.cursor.update(x, y, this.camera.p);
+
+    // test for collision with all tiles
     var t = this.board.collision(this.camera.vm(), this.cursor.p, this.cursor.d)
     var s = this.world.mesh.index[t];
+    this.world.mesh.selected = -1;
     for (var i = 0; i < this.world.mesh.num; i++)
     {
         if (i == s)
@@ -277,6 +274,7 @@ View.prototype.board_collision = function(x, y)
                 this.world.mesh.color[i] = this.world.mesh.WHITE_HOVER;
             else
                 this.world.mesh.color[i] = this.world.mesh.BLACK_HOVER;
+            this.world.mesh.selected = i;
         }
         else
         {
@@ -374,7 +372,7 @@ function World(gl, shader)
         shader.program.vertexColorAttribute,
         shader.program);
 
-    this.mesh.add(this.mesh.BOARD, [0, 0, 0], 0, this.mesh.WHITE, -1);
+    //this.mesh.add(this.mesh.BOARD, [0, 0, 0], 0, this.mesh.WHITE, -1);
 
     this.mesh.add(this.mesh.ROOK, [0, 0, 0], 0, 0, 0);
     this.mesh.add(this.mesh.ROOK, [2*7, 0, 0], 0, 0, 56);
@@ -469,13 +467,39 @@ Camera.prototype.vm = function()
     return vm;
 }
 
-function Board()
+function Board(gl)
 {
     this.centers = [];
     for (var i = 1; i < 16; i += 2)
         for (var j = 1; j < 16; j += 2)
             this.centers.push([i-8,j-8,0,1]);
+
+    this.vertices = [];
+    InitBoardVertices(gl, this.vertices);
+
+    this.normals = [];
+    InitBoardNormals(gl, this.normals);
+
+    this.colors = [];
+    InitBoardColors(gl, this.colors);
+
+    this.shaded = [];
+    InitBoardShaded(gl, this.shaded);
+
+    this.NUM_TILES = 64;
+    this.selected = -1;
 }
+
+Board.prototype.draw = function(shader)
+{
+    for (var i = 0; i < this.NUM_TILES; i++)
+    {
+        if (this.selected == i)
+            shader.draw(this.vertices[i], this.normals[i], this.shaded[i], shader.gl.TRIANGLES); 
+        else
+            shader.draw(this.vertices[i], this.normals[i], this.colors[i], shader.gl.TRIANGLES); 
+    }
+} 
 
 Board.prototype.collision = function(vm, p, d)
 {
@@ -592,7 +616,7 @@ function Mesh(gl, vpa, vna, vca, program)
     this.piece_vertices.push(InitBishopVertices(gl));
     this.piece_vertices.push(InitQueenVertices(gl));
     this.piece_vertices.push(InitKingVertices(gl));
-    this.piece_vertices.push(InitBoardVertices(gl));
+    //this.piece_vertices.push(InitBoardVertices(gl));
 
     // init color buffers for each piece type
     this.piece_colors = [];
@@ -605,7 +629,7 @@ function Mesh(gl, vpa, vna, vca, program)
         this.piece_colors[i].push(InitBishopColors(gl, i));
         this.piece_colors[i].push(InitQueenColors(gl, i));
         this.piece_colors[i].push(InitKingColors(gl, i));
-        this.piece_colors[i].push(InitBoardColors(gl, i));
+        //this.piece_colors[i].push(InitBoardColors(gl, i));
     }
 
     // init normal buffers for each piece type
@@ -616,7 +640,7 @@ function Mesh(gl, vpa, vna, vca, program)
     this.piece_normals.push(InitBishopNormals(gl));
     this.piece_normals.push(InitQueenNormals(gl));
     this.piece_normals.push(InitKingNormals(gl));
-    this.piece_normals.push(InitBoardNormals(gl));
+    //this.piece_normals.push(InitBoardNormals(gl));
 
     // piece types
     this.PAWN = 0;
@@ -625,7 +649,7 @@ function Mesh(gl, vpa, vna, vca, program)
     this.BISHOP = 3;
     this.QUEEN = 4;
     this.KING = 5;
-    this.BOARD = 6;
+    //this.BOARD = 6;
 
     // get mesh triangles for collision detection
     //this.triangles = [];
@@ -817,11 +841,11 @@ Mesh.prototype.ray_triangle_collision = function(i, vm, p, d)
     return min_t;
 }
 
-Mesh.prototype.draw = function(i)
+Mesh.prototype.draw = function(shader, i)
 {
     var t = this.type[i];
     var c = this.color[i];
-    this.draw_verts(this.piece_vertices[t], 
+    shader.draw(this.piece_vertices[t], 
                     this.piece_normals[t], 
                     this.piece_colors[c][t], 
                     this.TRIANGLES); 
@@ -829,6 +853,7 @@ Mesh.prototype.draw = function(i)
     //this.draw_verts(this.vert[i], this.LINE_LOOP, this.color[i]); 
 }
 
+/*
 Mesh.prototype.draw_verts = function(vertices, normals, colors, method)
 {
     // vertex buffers
@@ -876,6 +901,7 @@ Mesh.prototype.draw_verts = function(vertices, normals, colors, method)
     // draw stuff
     gl.drawArrays(method, 0, vertices.numItems);
 }
+*/
 
 function degToRad(degrees) 
 {

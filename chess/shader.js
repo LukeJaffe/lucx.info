@@ -1,6 +1,8 @@
 /* Shader class */
 function Shader(gl)
 {
+    this.gl = gl;
+
     var fragmentShader = this.get(gl, "shader-fs");
     var vertexShader = this.get(gl, "shader-vs");
 
@@ -16,13 +18,13 @@ function Shader(gl)
 
     gl.useProgram(this.program);
 
-    this.program.vertexPositionAttribute = gl.getAttribLocation(this.program, "aVertexPosition");
+    this.vpa = this.program.vertexPositionAttribute = gl.getAttribLocation(this.program, "aVertexPosition");
     gl.enableVertexAttribArray(this.program.vertexPositionAttribute);
 
-    this.program.vertexNormalAttribute = gl.getAttribLocation(this.program, "aVertexNormal");
+    this.vna = this.program.vertexNormalAttribute = gl.getAttribLocation(this.program, "aVertexNormal");
     gl.enableVertexAttribArray(this.program.vertexNormalAttribute);
 
-    this.program.vertexColorAttribute = gl.getAttribLocation(this.program, "aVertexColor");
+    this.vca = this.program.vertexColorAttribute = gl.getAttribLocation(this.program, "aVertexColor");
     gl.enableVertexAttribArray(this.program.vertexColorAttribute);
 
     this.program.pMatrixUniform = gl.getUniformLocation(this.program, "uPMatrix");
@@ -77,4 +79,55 @@ Shader.prototype.get = function(gl, id)
     }
 
     return shader;
+}
+
+Shader.prototype.draw = function(vertices, normals, colors, method)
+{
+    // shorten code
+    gl = this.gl;
+
+    // vertex buffers
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertices);
+    gl.vertexAttribPointer(this.vpa, vertices.itemSize, gl.FLOAT, false, 0, 0);
+
+    // normal buffers
+    gl.bindBuffer(gl.ARRAY_BUFFER, normals);
+    gl.vertexAttribPointer(this.vna, normals.itemSize, gl.FLOAT, false, 0, 0);
+
+    // color buffers
+    gl.bindBuffer(gl.ARRAY_BUFFER, colors);
+    gl.vertexAttribPointer(this.vca, colors.itemSize, gl.FLOAT, false, 0, 0);
+
+    // lighting
+    var lighting = document.getElementById("lighting").checked;
+    gl.uniform1i(this.program.useLightingUniform, lighting);
+    if (lighting) 
+    {
+        gl.uniform3f(
+            this.program.ambientColorUniform,
+            parseFloat(document.getElementById("ambientR").value),
+            parseFloat(document.getElementById("ambientG").value),
+            parseFloat(document.getElementById("ambientB").value)
+        );
+
+        var lightingDirection = [
+            parseFloat(document.getElementById("lightDirectionX").value),
+            parseFloat(document.getElementById("lightDirectionY").value),
+            parseFloat(document.getElementById("lightDirectionZ").value)
+        ];
+        var adjustedLD = vec3.create();
+        vec3.normalize(adjustedLD, lightingDirection);
+        vec3.scale(adjustedLD, adjustedLD, -1);
+        gl.uniform3fv(this.program.lightingDirectionUniform, adjustedLD);
+
+        gl.uniform3f(
+            this.program.directionalColorUniform,
+            parseFloat(document.getElementById("directionalR").value),
+            parseFloat(document.getElementById("directionalG").value),
+            parseFloat(document.getElementById("directionalB").value)
+        );
+    }
+
+    // draw stuff
+    gl.drawArrays(method, 0, vertices.numItems);
 }

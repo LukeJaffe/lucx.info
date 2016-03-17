@@ -8,7 +8,7 @@ knight_mesh = mesh.Mesh.from_file('/home/jaffe5/Projects/blender/models/stl/knig
 bishop_mesh = mesh.Mesh.from_file('/home/jaffe5/Projects/blender/models/stl/bishop.stl')
 queen_mesh = mesh.Mesh.from_file('/home/jaffe5/Projects/blender/models/stl/queen.stl')
 king_mesh = mesh.Mesh.from_file('/home/jaffe5/Projects/blender/models/stl/king.stl')
-board_mesh = mesh.Mesh.from_file('/home/jaffe5/Projects/blender/models/stl/board.stl')
+#board_mesh = mesh.Mesh.from_file('/home/jaffe5/Projects/blender/models/stl/board.stl')
 
 pieces = [
 {"mesh":pawn_mesh, "name":"Pawn"},
@@ -17,7 +17,7 @@ pieces = [
 {"mesh":bishop_mesh, "name":"Bishop"},
 {"mesh":queen_mesh, "name":"Queen"},
 {"mesh":king_mesh, "name":"King"},
-{"mesh":board_mesh, "name":"Board"}
+#{"mesh":board_mesh, "name":"Board"}
 ]
 
 colors = [
@@ -32,6 +32,101 @@ colors = [
 TILE_WIDTH = 2;
 NUM_X = 8;
 NUM_Y = 8;
+
+def gen_board():
+    # Write vertex buffers
+    out.write("function InitBoardVertices(gl, buffers)\n{\n")
+    out.write("var i = 0;\n")
+    for i in range(-22, -6, 2):
+        for j in range(-18, -2, 2):
+            out.write("buffers.push(gl.createBuffer());\n")
+            out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffers[i]);\n")
+            out.write("var vertices =\n") 
+            out.write("[\n")
+            out.write("%f,%f,%f," % (i, j, 0.25))
+            out.write("%f,%f,%f," % (i, j+2, 0.25))
+            out.write("%f,%f,%f," % (i+2, j, 0.25))
+            out.write("%f,%f,%f," % (i+2, j+2, 0.25))
+            out.write("%f,%f,%f," % (i, j+2, 0.25))
+            out.write("%f,%f,%f," % (i+2, j, 0.25))
+            out.write("];\n")
+            out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
+            out.write("buffers[i].itemSize = 3;\n");
+            out.write("buffers[i].numItems = 6;\n\n");
+            out.write("i++;\n")
+    out.write("}\n");
+
+    out.write("function InitBoardNormals(gl, buffers)\n{\n")
+    out.write("var i = 0;\n")
+    for i in range(0, 16, 2):
+        for j in range(0, 16, 2):
+            out.write("buffers.push(gl.createBuffer());\n")
+            out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffers[i]);\n")
+            out.write("var vertices =\n") 
+            out.write("[\n")
+            out.write("%f,%f,%f," % (0, 0, 1))
+            out.write("%f,%f,%f," % (0, 0, 1))
+            out.write("%f,%f,%f," % (0, 0, 1))
+            out.write("%f,%f,%f," % (0, 0, 1))
+            out.write("%f,%f,%f," % (0, 0, 1))
+            out.write("%f,%f,%f," % (0, 0, 1))
+            out.write("];\n")
+            out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
+            out.write("buffers[i].itemSize = 3;\n");
+            out.write("buffers[i].numItems = 6;\n\n");
+            out.write("i++;\n")
+    out.write("}\n");
+
+    out.write("function InitBoardColors(gl, buffers)\n{\n")
+    out.write("var i = 0;\n")
+    for i in range(8):
+        for j in range(8):
+            out.write("buffers.push(gl.createBuffer());\n")
+            out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffers[i]);\n")
+            out.write("var vertices =\n") 
+            out.write("[\n")
+            k = 8*i + j
+            if k%2 == 0:
+                if (k/8)%2 == 0:
+                    # black
+                    for t in range(6):
+                        out.write("%f,%f,%f,%f," % colors[3])
+                else:
+                    # white
+                    for t in range(6):
+                        out.write("%f,%f,%f,%f," % colors[0])
+            else:
+                if (k/8)%2 == 0:
+                    # white
+                    for t in range(6):
+                        out.write("%f,%f,%f,%f," % colors[0])
+                else:
+                    # black
+                    for t in range(6):
+                        out.write("%f,%f,%f,%f," % colors[3])
+            out.write("];\n")
+            out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
+            out.write("buffers[i].itemSize = 4;\n");
+            out.write("buffers[i].numItems = 6;\n\n");
+            out.write("i++;\n")
+    out.write("}\n");
+
+    out.write("function InitBoardShaded(gl, buffers)\n{\n")
+    out.write("var i = 0;\n")
+    for i in range(8):
+        for j in range(8):
+            out.write("buffers.push(gl.createBuffer());\n")
+            out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffers[i]);\n")
+            out.write("var vertices =\n") 
+            out.write("[\n")
+            for k in range(6):
+                out.write("%f,%f,%f,%f," % (0, 0, 1, 1))
+            out.write("];\n")
+            out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
+            out.write("buffers[i].itemSize = 4;\n");
+            out.write("buffers[i].numItems = 6;\n\n");
+            out.write("i++;\n")
+    out.write("}\n");
 
 def write_vertices(out, mesh, name):
     # Write vertex buffers
@@ -116,6 +211,9 @@ def write_triangles(out, mesh, name):
 
 # Create the javascript initBuffers() function, write it to a file
 out = open("/home/jaffe5/Projects/web/chess/verts.js", "wb")
+
+# Generate the board
+gen_board();
 
 # Write vertex function for each piece
 for piece in pieces:
