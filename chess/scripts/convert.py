@@ -20,6 +20,15 @@ pieces = [
 #{"mesh":board_mesh, "name":"Board"}
 ]
 
+for piece in pieces:
+    x = (np.min(piece["mesh"].x) + np.max(piece["mesh"].x))/2
+    y = (np.min(piece["mesh"].y) + np.max(piece["mesh"].y))/2
+    piece["mesh"].x -= x
+    piece["mesh"].y -= y
+    x = (np.min(piece["mesh"].x) + np.max(piece["mesh"].x))/2
+    y = (np.min(piece["mesh"].y) + np.max(piece["mesh"].y))/2
+    print piece["name"], round(x), round(y)
+
 colors = [
 (0.910, 0.800, 0.620, 1.0), # WHITE
 (0.810, 0.700, 0.520, 1.0), # WHITE_HOVER
@@ -37,8 +46,10 @@ def gen_board():
     # Write vertex buffers
     out.write("function InitBoardVertices(gl, buffers)\n{\n")
     out.write("var i = 0;\n")
-    for i in range(-22, -6, 2):
-        for j in range(-18, -2, 2):
+    #for i in range(-22, -6, 2):
+    #    for j in range(-18, -2, 2):
+    for i in range(0, 16, 2):
+        for j in range(0, 16, 2):
             out.write("buffers.push(gl.createBuffer());\n")
             out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffers[i]);\n")
             out.write("var vertices =\n") 
