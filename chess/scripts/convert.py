@@ -44,7 +44,7 @@ NUM_Y = 8;
 
 def gen_board():
     # Write vertex buffers
-    out.write("function InitBoardVertices(gl, buffers)\n{\n")
+    out.write("function InitBoardVertices(buffers)\n{\n")
     out.write("var i = 0;\n")
     #for i in range(-22, -6, 2):
     #    for j in range(-18, -2, 2):
@@ -67,7 +67,7 @@ def gen_board():
             out.write("i++;\n")
     out.write("}\n");
 
-    out.write("function InitBoardNormals(gl, buffers)\n{\n")
+    out.write("function InitBoardNormals(buffers)\n{\n")
     out.write("var i = 0;\n")
     for i in range(0, 16, 2):
         for j in range(0, 16, 2):
@@ -88,7 +88,7 @@ def gen_board():
             out.write("i++;\n")
     out.write("}\n");
 
-    out.write("function InitBoardColors(gl, buffers)\n{\n")
+    out.write("function InitBoardColors(buffers)\n{\n")
     out.write("var i = 0;\n")
     for i in range(8):
         for j in range(8):
@@ -122,7 +122,7 @@ def gen_board():
             out.write("i++;\n")
     out.write("}\n");
 
-    out.write("function InitBoardShaded(gl, buffers)\n{\n")
+    out.write("function InitBoardShaded(buffers)\n{\n")
     out.write("var i = 0;\n")
     for i in range(8):
         for j in range(8):
@@ -141,7 +141,7 @@ def gen_board():
 
 def write_vertices(out, mesh, name):
     # Write vertex buffers
-    out.write("function Init%sVertices(gl)\n{\n" % name)
+    out.write("function Init%sVertices()\n{\n" % name)
     out.write("var buffer = gl.createBuffer();\n")
     out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffer);\n")
     out.write("var vertices =\n") 
@@ -158,7 +158,7 @@ def write_vertices(out, mesh, name):
 
 def write_colors(out, mesh, name, colors):
     # Write color buffers
-    out.write("function Init%sColors(gl, c)\n{\n" % name)
+    out.write("function Init%sColors(c)\n{\n" % name)
     out.write("var buffer = gl.createBuffer();\n")
     out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffer);\n")
     out.write("var vertices = [];\n") 
@@ -190,7 +190,7 @@ def write_colors(out, mesh, name, colors):
 
 def write_normals(out, mesh, name):
     # Write vertex buffers
-    out.write("function Init%sNormals(gl)\n{\n" % name)
+    out.write("function Init%sNormals()\n{\n" % name)
     out.write("var buffer = gl.createBuffer();\n")
     out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffer);\n")
     out.write("var vertices =\n") 

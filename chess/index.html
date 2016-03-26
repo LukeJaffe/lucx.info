@@ -6,8 +6,8 @@
 
 <script type="text/javascript" src="gl-matrix.js"></script>
 <script type="text/javascript" src="webgl-utils.js"></script>
-<script type="text/javascript" src="verts.js"></script>
 
+<script type="text/javascript" src="verts.js"></script>
 <script type="text/javascript" src="shader.js"></script>
 <script type="text/javascript" src="cursor.js"></script>
 <script type="text/javascript" src="newgame.js"></script>
@@ -63,11 +63,36 @@
 </script>
 
 <script>
+    var gl, shader;
+
     function webGLStart() 
     {
+        // Init code
         var canvas = document.getElementById("canvas");
-        var game = new Game(canvas);
-        gl = game.gl;
+        try 
+        {
+            gl = canvas.getContext("experimental-webgl");
+            gl.viewport_width = canvas.width;
+            gl.viewport_height = canvas.height;
+        } 
+        catch (e) {console.log(e)}
+
+        if (!gl) 
+        {
+            alert("Could not initialise WebGL, sorry :-(");
+        }
+
+        shader = new Shader(gl);
+
+        Pawn.INIT_CONSTANTS();
+        Rook.INIT_CONSTANTS();
+        Knight.INIT_CONSTANTS();
+        Bishop.INIT_CONSTANTS();
+        Queen.INIT_CONSTANTS();
+        King.INIT_CONSTANTS();
+
+        // Main game object
+        var game = new Game();
 
         // program mouse events
         canvas.onmousedown = game.handle_mouse_down.bind(game);
@@ -84,9 +109,7 @@
     }
 </script>
 
-
 </head>
-
 
 <body onload="webGLStart();">
     <canvas id="canvas" style="border: none;" width="500" height="500"></canvas>

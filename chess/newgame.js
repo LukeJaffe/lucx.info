@@ -1,26 +1,17 @@
-/* Game class */
-function Game(canvas)
+/* Utility functions */
+//TODO: encapsulate and move to another file
+function degToRad(degrees) 
 {
-    this.canvas = canvas;
-    try 
-    {
-        this.gl = this.canvas.getContext("experimental-webgl");
-        this.gl.viewport_width = this.canvas.width;
-        this.gl.viewport_height = this.canvas.height;
-    } 
-    catch (e) {}
+    return degrees * Math.PI / 180;
+}
 
-    if (!this.gl) 
-    {
-        alert("Could not initialise WebGL, sorry :-(");
-    }
+/* Game class */
+function Game()
+{
+    this.view = new View(gl, this.shader);
 
-    this.shader = new Shader(this.gl);
-    this.view = new View(this.gl, this.shader);
-
-
-    this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    this.gl.enable(this.gl.DEPTH_TEST);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.enable(gl.DEPTH_TEST);
 
     // game stuff
     this.ps = false;
@@ -47,8 +38,8 @@ function Game(canvas)
 
 Game.prototype.clear = function()
 {
-    this.gl.viewport(0, 0, this.gl.viewport_width, this.gl.viewport_height);
-    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    gl.viewport(0, 0, gl.viewport_width, gl.viewport_height);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 }
 
 Game.prototype.tick = function() 
@@ -72,41 +63,7 @@ Game.prototype.tick = function()
             this.num_inc = 0;
         }
     }
-    this.draw();
-}
-
-Game.prototype.draw = function() 
-{
-    // clear the viewport
-    this.clear();
-
-    // set model view to identity
-    this.view.world.clear_mv();
-
-    // apply the view matrix to the model matrix
-    mat4.multiply(this.view.world.mv, this.view.world.mv, this.view.camera.vm());
-
-    // draw the board
-    this.view.world.push_mv();
-    this.view.board.set_mv(this.view.world.mv);
-    this.view.set();
-    this.view.board.draw(this.shader);
-    this.view.world.pop_mv();
-
-    // draw world objects
-    for (var i = 0; i < this.view.world.mesh.num; i++)
-    {
-        // push the current mv matrix on the stack
-        this.view.world.push_mv();
-        // set the mv matrix for mesh i
-        this.view.world.set_mv(i);
-        // set the shader matrices
-        this.view.set();
-        // draw the mesh
-        this.view.world.mesh.draw(this.shader, i);
-        // pop the top mv matrix off the stack
-        this.view.world.pop_mv();
-    }
+    this.view.draw();
 }
 
 Game.prototype.handle_mouse_down = function(event) 
@@ -117,8 +74,8 @@ Game.prototype.handle_mouse_down = function(event)
     this.mouse_down = true;
 
     // check to see if any meshs are selected
-    var ps = this.view.world.mesh.selected;
-    var bs = this.view.board.selected;
+    var ps = Piece.selected;
+    var bs = this.view.world.board.selected;
 
     if (this.ps)
     {
@@ -130,27 +87,27 @@ Game.prototype.handle_mouse_down = function(event)
         else
         {
             this.ps = false;
-            this.view.board.selected = -1;
+            this.view.world.board.selected = -1;
             this.view.clear_selected();
 
             // move the piece!
             console.log("t1: "+this.t1+", t2: "+this.t2);
-            dt = this.view.board.get_vector(this.t1, this.t2);
-            t = this.view.world.mesh.translation[ps];
-            this.view.world.mesh.translation[ps] = [t[0]+dt[0], t[1]+dt[1], t[2]];
+            dt = this.view.world.board.get_vector(this.t1, this.t2);
+            t = this.view.world.pieces[ps].position;
+            this.view.world.pieces[ps].position = [t[0]+dt[0], t[1]+dt[1], t[2]];
 
             // update the index of the piece
-            this.view.world.mesh.index[this.t2] = this.view.world.mesh.index[this.t1];
+            this.view.world.index[this.t2] = this.view.world.index[this.t1];
         }
         return;
     }
 
     if (ps !== -1)
     {
-        if (this.view.world.mesh.team[ps] == this.view.world.mesh.WHITE)
-            this.view.world.mesh.color[ps] = this.view.world.mesh.WHITE_SELECTED;
+        if (this.view.world.pieces[ps].team == Piece.TEAMS.WHITE)
+            this.view.world.pieces[ps].color = Piece.COLORS.WHITE_SELECTED;
         else
-            this.view.world.mesh.color[ps] = this.view.world.mesh.BLACK_SELECTED;
+            this.view.world.pieces[ps].color = Piece.COLORS.BLACK_SELECTED;
         this.ps = true;
     }
 }
@@ -187,7 +144,7 @@ Game.prototype.handle_mouse_move = function(event)
         // Check for mouse collisions with the board
         this.t2 = this.view.board_collision(new_x, new_y);
         // Check if the piece can move here 
-        this.view.board.selected = this.t2;
+        this.view.world.board.selected = this.t2;
     }
     else
     {
@@ -249,25 +206,18 @@ Game.prototype.handle_key_up = function(event)
         this.shift_down = false;
 
         // clear all selections
-        this.view.clear_selected();
+        //this.view.clear_selected();
     }
 }
 
 /* View class */
-function View(gl, shader)
+function View()
 {
-    // save gl, shader here b/c they are used multiple times
-    this.gl = gl;
-    this.shader = shader;
-
     // world
-    this.world = new World(this.gl, this.shader);
-
-    // game board
-    this.board = new Board(this.gl);
+    this.world = new World();
 
     // camera
-    this.camera = new Camera(this.gl);
+    this.camera = new Camera(gl);
 
     // cursor
     this.cursor = new Cursor();
@@ -276,173 +226,233 @@ function View(gl, shader)
     this.mode = 0; // zoomed out
 }
 
-View.prototype.set = function()
+View.prototype = 
 {
-    this.gl.uniformMatrix4fv(this.shader.program.pMatrixUniform, false, this.camera.p);
-    this.gl.uniformMatrix4fv(this.shader.program.mvMatrixUniform, false, this.world.mv);
-
-    var normalMatrix = mat3.create();
-    mat4.toInverseMat3(this.world.mv, normalMatrix);
-    mat3.transpose(normalMatrix, normalMatrix);
-    this.gl.uniformMatrix3fv(this.shader.program.nMatrixUniform, false, normalMatrix);
-}
-
-View.prototype.board_collision = function(x, y)
-{
-    // update cursor
-    this.cursor.update(x, y, this.camera.p);
-
-    // test for collision with all tiles
-    var t = this.board.collision(this.camera.vm(), this.cursor.p, this.cursor.d)
-    return t;
-}
-
-View.prototype.piece_collision = function(x, y)
-{
-    // update cursor
-    this.cursor.update(x, y, this.camera.p);
-
-    // test for collision with all tiles
-    var t = this.board.collision(this.camera.vm(), this.cursor.p, this.cursor.d)
-    var s = this.world.mesh.index[t];
-    this.world.mesh.selected = -1;
-    for (var i = 0; i < this.world.mesh.num; i++)
+    set : function()
     {
-        if (i == s)
+        gl.uniformMatrix4fv(shader.program.pMatrixUniform, false, this.camera.p);
+        gl.uniformMatrix4fv(shader.program.mvMatrixUniform, false, this.world.mv);
+
+        var normalMatrix = mat3.create();
+        mat4.toInverseMat3(this.world.mv, normalMatrix);
+        mat3.transpose(normalMatrix, normalMatrix);
+        gl.uniformMatrix3fv(shader.program.nMatrixUniform, false, normalMatrix);
+    },
+
+    draw : function(vm)
+    {
+        // clear the viewport
+        gl.viewport(0, 0, gl.viewport_width, gl.viewport_height);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // set model view to identity
+        this.world.clear_mv();
+
+        // apply the view matrix to the model matrix
+        mat4.multiply(this.world.mv, this.world.mv, this.camera.vm());
+
+        // draw the board
+        this.world.push_mv();
+        this.world.board.set_mv(this.world.mv);
+        this.set();
+        this.world.board.draw(shader);
+        this.world.pop_mv();
+
+        // draw world objects
+        for (var i = 0; i < this.world.pieces.length; i++)
         {
-            if (this.world.mesh.team[i] == this.world.mesh.WHITE)
-                this.world.mesh.color[i] = this.world.mesh.WHITE_HOVER;
+            // push the current mv matrix on the stack
+            this.world.push_mv();
+            // set the mv matrix for mesh i
+            this.world.pieces[i].move(this.world.mv);
+            // set the shader matrices
+            this.set();
+            // draw the mesh
+            this.world.pieces[i].draw(this.world.pieces[i].color);
+            // pop the top mv matrix off the stack
+            this.world.pop_mv();
+        }
+    },
+
+    board_collision : function(x, y)
+    {
+        // update cursor
+        this.cursor.update(x, y, this.camera.p);
+
+        // test for collision with all tiles
+        var t = this.world.board.collision(this.camera.vm(), this.cursor.p, this.cursor.d)
+        return t;
+    },
+
+    piece_collision : function(x, y)
+    {
+        // update cursor
+        this.cursor.update(x, y, this.camera.p);
+
+        // test for collision with all tiles
+        var t = this.world.board.collision(this.camera.vm(), this.cursor.p, this.cursor.d)
+        var s = this.world.index[t];
+        Piece.selected = -1;
+        for (var i = 0; i < this.world.pieces.length; i++)
+        {
+            if (i == s)
+            {
+                if (this.world.pieces[i].team == Piece.COLORS.WHITE)
+                    this.world.pieces[i].color = Piece.COLORS.WHITE_HOVER;
+                else
+                    this.world.pieces[i].color = Piece.COLORS.BLACK_HOVER;
+                Piece.selected = i;
+            }
             else
-                this.world.mesh.color[i] = this.world.mesh.BLACK_HOVER;
-            this.world.mesh.selected = i;
+            {
+                this.world.pieces[i].color = this.world.pieces[i].team*3;
+            }
         }
-        else
+        return t;
+    },
+
+
+    sphere_collision : function(x, y)
+    {
+        // update cursor
+        this.cursor.update(x, y, this.camera.p);
+
+        // check for collisions in world space
+        var min_d = Infinity;
+        var min_i = -1;
+        for (var i = 0; i < this.world.mesh.num; i++)
         {
-            this.world.mesh.color[i] = this.world.mesh.team[i];
+            d = this.world.mesh.ray_sphere_collision(i, this.camera.vm(), this.cursor.p, this.cursor.d);
+            if (d < min_d)
+            {
+                min_d = d;
+                min_i = i;
+            }
         }
-    }
-    return t;
+
+        // update selected mesh
+        this.world.mesh.selected = -1;
+        for (var i = 0; i < this.world.mesh.num; i++)
+        {
+            if (i == min_i)
+            {
+                this.world.mesh.color[i] = 3;
+                this.world.mesh.selected = i;
+            }
+            else
+                this.world.mesh.color[i] = 1;
+        }
+    },
+
+    clear_selected : function()
+    {
+        Piece.selected = -1;
+        for (var i = 0; i < this.world.pieces.length; i++)
+        {
+            this.world.pieces[i].color = this.world.pieces[i].team*3;
+        }
+    },
 }
 
 
-View.prototype.sphere_collision = function(x, y)
-{
-    // update cursor
-    this.cursor.update(x, y, this.camera.p);
-
-    // check for collisions in world space
-    var min_d = Infinity;
-    var min_i = -1;
-    for (var i = 0; i < this.world.mesh.num; i++)
-    {
-        d = this.world.mesh.ray_sphere_collision(i, this.camera.vm(), this.cursor.p, this.cursor.d);
-        if (d < min_d)
-        {
-            min_d = d;
-            min_i = i;
-        }
-    }
-
-    // update selected mesh
-    this.world.mesh.selected = -1;
-    for (var i = 0; i < this.world.mesh.num; i++)
-    {
-        if (i == min_i)
-        {
-            this.world.mesh.color[i] = 3;
-            this.world.mesh.selected = i;
-        }
-        else
-            this.world.mesh.color[i] = 1;
-    }
-}
-
-View.prototype.clear_selected = function()
-{
-    this.world.mesh.selected = -1;
-    for (var i = 0; i < this.world.mesh.num; i++)
-    {
-        this.world.mesh.color[i] = this.world.mesh.team[i];
-    }
-}
-
-
-/* Model View class */
-function World(gl, shader)
+function World()
 {
     // matrices
     this.stack = [];
     this.mv = mat4.create();
 
-    // objects
-    this.mesh = new Mesh(gl, 
-        shader.program.vertexPositionAttribute,
-        shader.program.vertexNormalAttribute,
-        shader.program.vertexColorAttribute,
-        shader.program);
+    // chess board
+    this.board = new Board();
 
-    //this.mesh.add(this.mesh.BOARD, [0, 0, 0], 0, this.mesh.WHITE, -1);
+    // chess piece variables
+    this.pieces = [];
+    this.index = [];
+    for (var i = 0; i < 8*8; i++)
+        this.index.push(-1);
+    this.num = 0;
 
-    this.mesh.add(this.mesh.ROOK, [1, 1, 0], 0, 0, 0);
-    this.mesh.add(this.mesh.KNIGHT, [3, 1, 0], 0, 0, 8);
-    this.mesh.add(this.mesh.BISHOP, [5, 1, 0], 0, 0, 16);
-    this.mesh.add(this.mesh.QUEEN, [7, 1, 0], 0, 0, 24);
-    this.mesh.add(this.mesh.KING, [9, 1, 0], 0, 0, 32);
-    this.mesh.add(this.mesh.KNIGHT, [11, 1, 0], 0, 0, 40);
-    this.mesh.add(this.mesh.BISHOP, [13, 1, 0], 0, 0, 48);
-    this.mesh.add(this.mesh.ROOK, [15, 1, 0], 0, 0, 56);
+    // drawable stuff
 
-    this.mesh.add(this.mesh.ROOK, [1, 15, 0], 0, 3, 7);
-    this.mesh.add(this.mesh.KNIGHT, [3, 15, 0], 1, 3, 15);
-    this.mesh.add(this.mesh.BISHOP, [5, 15, 0], 1, 3, 23);
-    this.mesh.add(this.mesh.QUEEN, [7, 15, 0], 0, 3, 31);
-    this.mesh.add(this.mesh.KING, [9, 15, 0], 0, 3, 39);
-    this.mesh.add(this.mesh.BISHOP, [11, 15, 0], 1, 3, 47);
-    this.mesh.add(this.mesh.KNIGHT, [13, 15, 0], 1, 3, 55);
-    this.mesh.add(this.mesh.ROOK, [15, 15, 0], 0, 3, 63);
+    // add all pieces
+    this.add(Piece.TYPES.ROOK,    [1, 1, 0],   0, Piece.TEAMS.WHITE, 0);
+    this.add(Piece.TYPES.KNIGHT,  [3, 1, 0],   0, Piece.TEAMS.WHITE, 8);
+    this.add(Piece.TYPES.BISHOP,  [5, 1, 0],   0, Piece.TEAMS.WHITE, 16);
+    this.add(Piece.TYPES.QUEEN,   [7, 1, 0],   0, Piece.TEAMS.WHITE, 24);
+    this.add(Piece.TYPES.KING,    [9, 1, 0],   0, Piece.TEAMS.WHITE, 32);
+    this.add(Piece.TYPES.BISHOP,  [11, 1, 0],  0, Piece.TEAMS.WHITE, 40);
+    this.add(Piece.TYPES.KNIGHT,  [13, 1, 0],  0, Piece.TEAMS.WHITE, 48);
+    this.add(Piece.TYPES.ROOK,    [15, 1, 0],  0, Piece.TEAMS.WHITE, 56);
+
+    this.add(Piece.TYPES.ROOK,    [1, 15, 0],  0, Piece.TEAMS.BLACK, 7);
+    this.add(Piece.TYPES.KNIGHT,  [3, 15, 0],  1, Piece.TEAMS.BLACK, 15);
+    this.add(Piece.TYPES.BISHOP,  [5, 15, 0],  1, Piece.TEAMS.BLACK, 23);
+    this.add(Piece.TYPES.QUEEN,   [7, 15, 0],  0, Piece.TEAMS.BLACK, 31);
+    this.add(Piece.TYPES.KING,    [9, 15, 0],  0, Piece.TEAMS.BLACK, 39);
+    this.add(Piece.TYPES.BISHOP,  [11, 15, 0], 1, Piece.TEAMS.BLACK, 47);
+    this.add(Piece.TYPES.KNIGHT,  [13, 15, 0], 1, Piece.TEAMS.BLACK, 55);
+    this.add(Piece.TYPES.ROOK,    [15, 15, 0], 0, Piece.TEAMS.BLACK, 63);
 
     for (var i = 0; i < 8; i++)
-        this.mesh.add(this.mesh.PAWN, [2*i+1, 3, 0], 0, this.mesh.WHITE, (8*i)+1);
+        this.add(Piece.TYPES.PAWN, [2*i+1, 3, 0], 0, Piece.TEAMS.WHITE, (8*i)+1);
 
     for (var i = 0; i < 8; i++)
-        this.mesh.add(this.mesh.PAWN, [2*i+1, 13, 0], 0, this.mesh.BLACK, (8*i)+6);
+        this.add(Piece.TYPES.PAWN, [2*i+1, 13, 0], 0, Piece.TEAMS.BLACK, (8*i)+6);
 }
 
-World.prototype.clear_mv = function()
+World.prototype = 
 {
-    mat4.identity(this.mv);
-}
-
-World.prototype.rotate_mv = function(rm)
-{
-    mat4.multiply(this.mv, rm, this.mv);
-}
-
-World.prototype.translate_mv = function(tv)
-{
-    mat4.translate(this.mv, this.mv, tv);
-}
-
-World.prototype.set_mv = function(i)
-{
-    this.mesh.set_mv(i, this.mv)
-}
-
-World.prototype.push_mv = function()
-{
-    var copy = mat4.create();
-    mat4.copy(copy, this.mv);
-    this.stack.push(copy);
-}
-
-World.prototype.pop_mv = function()
-{
-    if (this.stack.length == 0) 
+    add : function(type, position, flip, team, tile)
     {
-        throw "Invalid popMatrix!";
+        switch (type)
+        {
+            case Piece.TYPES.PAWN:
+                this.pieces.push(new Pawn(position, flip, team));
+                break;
+            case Piece.TYPES.ROOK:
+                this.pieces.push(new Rook(position, flip, team));
+                break;
+            case Piece.TYPES.KNIGHT:
+                this.pieces.push(new Knight(position, flip, team));
+                break;
+            case Piece.TYPES.BISHOP:
+                this.pieces.push(new Bishop(position, flip, team));
+                break;
+            case Piece.TYPES.QUEEN:
+                this.pieces.push(new Queen(position, flip, team));
+                break;
+            case Piece.TYPES.KING:
+                this.pieces.push(new King(position, flip, team));
+                break;
+            default:
+                break;
+        }
+        this.index[tile] = this.num;
+        this.num++;
+    },
+
+
+    clear_mv : function()
+    {
+        mat4.identity(this.mv);
+    },
+
+    push_mv : function()
+    {
+        var copy = mat4.create();
+        mat4.copy(copy, this.mv);
+        this.stack.push(copy);
+    },
+
+    pop_mv : function()
+    {
+        if (this.stack.length == 0) 
+        {
+            throw "Invalid popMatrix!";
+        }
+        this.mv = this.stack.pop();
     }
-    this.mv = this.stack.pop();
 }
+
 
 /* Perspective class */
 function Camera(gl)
@@ -476,7 +486,7 @@ Camera.prototype.vm = function()
     return vm;
 }
 
-function Board(gl)
+function Board()
 {
     this.centers = [];
     for (var i = 1; i < 16; i += 2)
@@ -484,16 +494,16 @@ function Board(gl)
             this.centers.push([i,j,0,1]);
 
     this.vertices = [];
-    InitBoardVertices(gl, this.vertices);
+    InitBoardVertices(this.vertices);
 
     this.normals = [];
-    InitBoardNormals(gl, this.normals);
+    InitBoardNormals(this.normals);
 
     this.colors = [];
-    InitBoardColors(gl, this.colors);
+    InitBoardColors(this.colors);
 
     this.shaded = [];
-    InitBoardShaded(gl, this.shaded);
+    InitBoardShaded(this.shaded);
 
     this.NUM_TILES = 64;
     this.selected = -1;
@@ -511,14 +521,14 @@ Board.prototype.get_vector = function(i, j)
     return uv = [v[0] - u[0], v[1] - u[1]];
 }
 
-Board.prototype.draw = function(shader)
+Board.prototype.draw = function()
 {
     for (var i = 0; i < this.NUM_TILES; i++)
     {
         if (this.selected == i)
-            shader.draw(this.vertices[i], this.normals[i], this.shaded[i], shader.gl.TRIANGLES); 
+            shader.draw(this.vertices[i], this.normals[i], this.shaded[i], gl.TRIANGLES); 
         else
-            shader.draw(this.vertices[i], this.normals[i], this.colors[i], shader.gl.TRIANGLES); 
+            shader.draw(this.vertices[i], this.normals[i], this.colors[i], gl.TRIANGLES); 
     }
 } 
 
@@ -597,203 +607,233 @@ Board.prototype.collision = function(vm, p, d)
     return min_i;
 }
 
-/* Triangle mesh class */
-function Mesh(gl, vpa, vna, vca, program)
+/* Chess piece class */
+function Piece(position, flip, team)
 {
-    // colors
-    this.WHITE = 0;
-    this.WHITE_HOVER = 1;
-    this.WHITE_SELECTED = 2;
-    this.BLACK = 3;
-    this.BLACK_HOVER = 4;
-    this.BLACK_SELECTED = 5;
-    this.NUM_COLORS = 6;
+    this.position = position;
+    this.flip = flip;
 
-    // reference to the shader program (REMOVE ME)
-    this.program = program;
-
-    // properties unique to each mesh
-    this.vert = [];
-    this.color = [];
-    this.team = [];
-    this.normal = [];
-    this.translation = [];
-    this.flip = [];
-    this.type = [];
-
-    // tile positions
-    this.index = [];
-    for (var i = 0; i < 8*8; i++)
-        this.index.push(-1);
-
-    // static properties
-    this.selected = -1;
-
-    // init buffers for vertices of each piece type
-    this.piece_vertices = [];
-    this.piece_vertices.push(InitPawnVertices(gl));
-    this.piece_vertices.push(InitRookVertices(gl));
-    this.piece_vertices.push(InitKnightVertices(gl));
-    this.piece_vertices.push(InitBishopVertices(gl));
-    this.piece_vertices.push(InitQueenVertices(gl));
-    this.piece_vertices.push(InitKingVertices(gl));
-    //this.piece_vertices.push(InitBoardVertices(gl));
-
-    // init color buffers for each piece type
-    this.piece_colors = [];
-    for (var i = 0; i < this.NUM_COLORS; i++)
-    {
-        this.piece_colors.push([]);
-        this.piece_colors[i].push(InitPawnColors(gl, i));
-        this.piece_colors[i].push(InitRookColors(gl, i));
-        this.piece_colors[i].push(InitKnightColors(gl, i));
-        this.piece_colors[i].push(InitBishopColors(gl, i));
-        this.piece_colors[i].push(InitQueenColors(gl, i));
-        this.piece_colors[i].push(InitKingColors(gl, i));
-        //this.piece_colors[i].push(InitBoardColors(gl, i));
-    }
-
-    // init normal buffers for each piece type
-    this.piece_normals = [];
-    this.piece_normals.push(InitPawnNormals(gl));
-    this.piece_normals.push(InitRookNormals(gl));
-    this.piece_normals.push(InitKnightNormals(gl));
-    this.piece_normals.push(InitBishopNormals(gl));
-    this.piece_normals.push(InitQueenNormals(gl));
-    this.piece_normals.push(InitKingNormals(gl));
-    //this.piece_normals.push(InitBoardNormals(gl));
-
-    // piece types
-    this.PAWN = 0;
-    this.ROOK = 1;
-    this.KNIGHT = 2;
-    this.BISHOP = 3;
-    this.QUEEN = 4;
-    this.KING = 5;
-    //this.BOARD = 6;
-
-    // vertex attributes
-    this.vpa = vpa;
-    this.vna = vna;
-    this.vca = vca; 
-
-    // drawing methods
-    this.TRIANGLES = gl.TRIANGLES;
-    this.LINE_LOOP = gl.LINE_LOOP;
-
-    // number of meshs
-    this.num = 0;
-} 
-
-Mesh.prototype.add = function(type, position, flip, color, tile)
-{
-    this.type.push(type);
-    this.color.push(color);
-    this.team.push(color);
-    this.translation.push(position);
-    this.flip.push(flip);
-    this.index[tile] = this.num;
-    this.num++;
-}
-
-Mesh.prototype.set_t = function(i, t)
-{
-    this.translation[i] = t;
-}
-
-Mesh.prototype.update_r = function(i, r)
-{
-    mat4.multiply(this.r_mats[i], r, this.r_mats[i]);
-}
-
-Mesh.prototype.set_r = function()
-{
-
-}
-
-Mesh.prototype.set_mv = function(i, mv)
-{
-    mat4.translate(mv, mv, this.translation[i]);
-    if (this.flip[i])
-        mat4.rotate(mv, mv, degToRad(180), [0,0,1]);
-}
-
-Mesh.prototype.ray_sphere_collision = function(i, vm, p, d)
-{
-    // make the model view matrix for this mesh
-    this.set_mv(i, vm);
-
-    // get world center of sphere
-    var c = [0.0, 0.0, 0.0, 1.0];
-    var wc = vec4.create();
-    vec4.transformMat4(wc, c, vm); 
-    c = [wc[0], wc[1], wc[2]];  
-
-    // radius is about 1.0
-    var r = 1.0;
-
-    // vector from p to c
-    var vpc = vec3.create();
-    vec3.subtract(vpc, c, p);
-    var vpc_m = vec3.length(vpc);
-    
-    // distance from vpc to d
-    var loc = vec3.dot(vpc, d);
-
-    // calculate pc: projection of center onto ray (u onto v)
-    var rdc = vec3.dot(d, c);
-    var pc = vec3.create();
-    vec3.scale(pc, d, rdc);
-
-    // sphere behind origin p
-    if (loc < 0)
-    {
-        if (vpc_m > r)
-            console.log("No intersection");
-        else if (vpc_m == r)
-            console.log("Single intersection");
-        else
-            console.log("Double intersection");
-    }
-    // center of sphere projects on the ray
+    // set team and color accordingly
+    this.team = team 
+    if (this.team == Piece.TEAMS.WHITE)
+        this.color = Piece.COLORS.WHITE;
     else
-    {
-        var vpcc = vec3.create();
-        vec3.subtract(vpcc, c, pc);
-        if (vec3.length(vpcc) > r)
-        {
-            return Infinity;
-        }
-        else
-        {
-            // get the distance from pc to the first intersection point
-            var pcc = vec3.create();
-            vec3.subtract(pcc, pc, c);
-            var pcc_len = vec3.length(pcc);
-            var dist = Math.sqrt(r*r - pcc_len*pcc_len)
+        this.color = Piece.COLORS.BLACK;
+}
 
-            // get the distance from p to the first intersection point
-            var pcp = vec3.create();
-            vec3.subtract(pcp, pc, p);
-            if (vpc_m > r)
-                return vec3.length(pcp) - dist;
-            else
-                return vec3.length(pcp) + dist;
-        } 
+/* Piece constants */
+Piece.TYPES = 
+{
+    PAWN : 0,
+    ROOK : 1,
+    KNIGHT : 2,
+    BISHOP : 3,
+    QUEEN : 4,
+    KING : 5
+}
+
+Piece.COLORS = 
+{
+    WHITE : 0,
+    WHITE_HOVER : 1,
+    WHITE_SELECTED : 2,
+    BLACK : 3,
+    BLACK_HOVER : 4,
+    BLACK_SELECTED : 5,
+    NUM : 6
+}
+
+Piece.TEAMS = 
+{
+    WHITE : 0,
+    BLACK : 1
+}
+
+/* Piece methods */
+Piece.prototype = 
+{
+    // Empty methods: must be implemented in child
+    vertices : function() { return null; },
+    normals : function() { return null; },
+    colors : function(i) { return null; },
+
+    // Translate and rotate the model view
+    move : function(mv)
+    {
+        mat4.translate(mv, mv, this.position);
+        if (this.flip)
+            mat4.rotate(mv, mv, degToRad(180), [0,0,1]);
+    },
+
+    // Draw function
+    // TODO: make gl and shader global?
+    draw : function(color)
+    {
+        shader.draw(this.vertices(), this.normals(), this.colors(color), gl.TRIANGLES);
+    }
+};
+
+/* Piece global attibutes */
+Piece.selected = -1;
+
+/* Pawn class */
+function Pawn(position, flip, team)
+{
+    Piece.call(this, position, flip, team)
+}
+
+/* Pawn constants */
+/* NOTE: Must be done like this because 
+ * these functions use global gl variable 
+ * which must be initialized before it can be used */
+Pawn.INIT_CONSTANTS = function ()
+{
+    Pawn.VERTICES = InitPawnVertices(); 
+    Pawn.NORMALS = InitPawnNormals();
+    Pawn.COLORS = [];
+    for (var i = 0; i < Piece.COLORS.NUM; i++)
+    {
+        Pawn.COLORS.push(InitPawnColors(i));
     }
 }
 
-Mesh.prototype.draw = function(shader, i)
+/* Pawn methods */
+Pawn.prototype = Object.create(Piece.prototype,
 {
-    var t = this.type[i];
-    var c = this.color[i];
-    shader.draw(this.piece_vertices[t], 
-                    this.piece_normals[t], 
-                    this.piece_colors[c][t], 
-                    this.TRIANGLES); 
+    vertices : { value : function() { return Pawn.VERTICES; } },
+    normals : { value : function() { return Pawn.NORMALS; } },
+    colors : { value : function(i) { return Pawn.COLORS[i]; } },
+});
+
+
+/* Rook class */
+function Rook(position, flip, team)
+{
+    Piece.call(this, position, flip, team)
 }
 
-function degToRad(degrees) 
+/* Rook constants */
+Rook.INIT_CONSTANTS = function ()
 {
-    return degrees * Math.PI / 180;
+    Rook.VERTICES = InitRookVertices(); 
+    Rook.NORMALS = InitRookNormals();
+    Rook.COLORS = [];
+    for (var i = 0; i < Piece.COLORS.NUM; i++)
+    {
+        Rook.COLORS.push(InitRookColors(i));
+    }
 }
+
+/* Rook methods */
+Rook.prototype = Object.create(Piece.prototype,
+{
+    vertices : { value : function() { return Rook.VERTICES; } },
+    normals : { value : function() { return Rook.NORMALS; } },
+    colors : { value : function(i) { return Rook.COLORS[i]; } },
+});
+
+
+/* Knight class */
+function Knight(position, flip, team)
+{
+    Piece.call(this, position, flip, team)
+}
+
+/* Knight constants */
+Knight.INIT_CONSTANTS = function ()
+{
+    Knight.VERTICES = InitKnightVertices(); 
+    Knight.NORMALS = InitKnightNormals();
+    Knight.COLORS = [];
+    for (var i = 0; i < Piece.COLORS.NUM; i++)
+    {
+        Knight.COLORS.push(InitKnightColors(i));
+    }
+}
+
+/* Knight methods */
+Knight.prototype = Object.create(Piece.prototype,
+{
+    vertices : { value : function() { return Knight.VERTICES; } },
+    normals : { value : function() { return Knight.NORMALS; } },
+    colors : { value : function(i) { return Knight.COLORS[i]; } },
+});
+
+
+/* Bishop class */
+function Bishop(position, flip, team)
+{
+    Piece.call(this, position, flip, team)
+}
+
+/* Bishop constants */
+Bishop.INIT_CONSTANTS = function ()
+{
+    Bishop.VERTICES = InitBishopVertices(); 
+    Bishop.NORMALS = InitBishopNormals();
+    Bishop.COLORS = [];
+    for (var i = 0; i < Piece.COLORS.NUM; i++)
+    {
+        Bishop.COLORS.push(InitBishopColors(i));
+    }
+}
+
+/* Bishop methods */
+Bishop.prototype = Object.create(Piece.prototype,
+{
+    vertices : { value : function() { return Bishop.VERTICES; } },
+    normals : { value : function() { return Bishop.NORMALS; } },
+    colors : { value : function(i) { return Bishop.COLORS[i]; } },
+});
+
+/* Queen class */
+function Queen(position, flip, team)
+{
+    Piece.call(this, position, flip, team)
+}
+
+/* Queen constants */
+Queen.INIT_CONSTANTS = function ()
+{
+    Queen.VERTICES = InitQueenVertices(); 
+    Queen.NORMALS = InitQueenNormals();
+    Queen.COLORS = [];
+    for (var i = 0; i < Piece.COLORS.NUM; i++)
+    {
+        Queen.COLORS.push(InitQueenColors(i));
+    }
+}
+
+/* Queen methods */
+Queen.prototype = Object.create(Piece.prototype,
+{
+    vertices : { value : function() { return Queen.VERTICES; } },
+    normals : { value : function() { return Queen.NORMALS; } },
+    colors : { value : function(i) { return Queen.COLORS[i]; } },
+});
+
+/* King class */
+function King(position, flip, team)
+{
+    Piece.call(this, position, flip, team)
+}
+
+/* King constants */
+King.INIT_CONSTANTS = function ()
+{
+    King.VERTICES = InitKingVertices(); 
+    King.NORMALS = InitKingNormals();
+    King.COLORS = [];
+    for (var i = 0; i < Piece.COLORS.NUM; i++)
+    {
+        King.COLORS.push(InitKingColors(i));
+    }
+}
+
+/* King methods */
+King.prototype = Object.create(Piece.prototype,
+{
+    vertices : { value : function() { return King.VERTICES; } },
+    normals : { value : function() { return King.NORMALS; } },
+    colors : { value : function(i) { return King.COLORS[i]; } },
+});
