@@ -187,11 +187,7 @@ Game.prototype.handle_mouse_move = function(event)
         // Check for mouse collisions with the board
         this.t2 = this.view.board_collision(new_x, new_y);
         // Check if the piece can move here 
-        //var ps = this.view.world.mesh.selected;
-        //if (this.view.world.mesh.type[ps] == this.view.world.mesh.KNIGHT)
         this.view.board.selected = this.t2;
-
-        // Select the board tile
     }
     else
     {
@@ -340,38 +336,6 @@ View.prototype.sphere_collision = function(x, y)
     for (var i = 0; i < this.world.mesh.num; i++)
     {
         d = this.world.mesh.ray_sphere_collision(i, this.camera.vm(), this.cursor.p, this.cursor.d);
-        if (d < min_d)
-        {
-            min_d = d;
-            min_i = i;
-        }
-    }
-
-    // update selected mesh
-    this.world.mesh.selected = -1;
-    for (var i = 0; i < this.world.mesh.num; i++)
-    {
-        if (i == min_i)
-        {
-            this.world.mesh.color[i] = 3;
-            this.world.mesh.selected = i;
-        }
-        else
-            this.world.mesh.color[i] = 1;
-    }
-}
-
-View.prototype.face_collision = function(x, y)
-{
-    // update cursor
-    this.cursor.update(x, y, this.camera.p);
-
-    // check for collisions in world space
-    var min_d = Infinity;
-    var min_i = -1;
-    for (var i = 0; i < this.world.mesh.num; i++)
-    {
-        d = this.world.mesh.ray_triangle_collision(i, this.camera.vm(), this.cursor.p, this.cursor.d);
         if (d < min_d)
         {
             min_d = d;
@@ -708,10 +672,6 @@ function Mesh(gl, vpa, vna, vca, program)
     this.KING = 5;
     //this.BOARD = 6;
 
-    // get mesh triangles for collision detection
-    //this.triangles = [];
-    //InitTriangles(this.triangles);
-
     // vertex attributes
     this.vpa = vpa;
     this.vna = vna;
@@ -823,78 +783,6 @@ Mesh.prototype.ray_sphere_collision = function(i, vm, p, d)
     }
 }
 
-Mesh.prototype.ray_triangle_collision = function(i, vm, p, d)
-{
-    // make the model view matrix for this mesh
-    this.set_mv(i, vm);
-
-    // vertices
-    var wv = vec4.create();
-    var v0 = vec3.create();
-    var v1 = vec3.create();
-    var v2 = vec3.create();
-
-    var min_t = Infinity;
-    var min_j = -1;
-
-    for (var j = 0; j < this.triangles.length; j++)
-    {
-        var v0 = [this.triangles[j][0][0], this.triangles[j][0][1], this.triangles[j][0][2], 1];
-        vec4.transformMat4(wv, v0, vm); 
-        v0 = [wv[0], wv[1], wv[2]];  
-
-        var v1 = [this.triangles[j][1][0], this.triangles[j][1][1], this.triangles[j][1][2], 1];
-        vec4.transformMat4(wv, v1, vm); 
-        v1 = [wv[0], wv[1], wv[2]];  
-
-        var v2 = [this.triangles[j][2][0], this.triangles[j][2][1], this.triangles[j][2][2], 1];
-        vec4.transformMat4(wv, v2, vm); 
-        v2 = [wv[0], wv[1], wv[2]];  
-
-        var e1 = vec3.create();
-        var e2 = vec3.create();
-
-        vec3.subtract(e1, v1, v0);
-        vec3.subtract(e2, v2, v0);
-
-        var h = vec3.create();
-        vec3.cross(h, d, e2);
-        var a = vec3.dot(e1, h);
-
-        if (a > -0.00001 && a < 0.00001)
-            continue;
-
-        var f = 1.0/a;
-        var s = vec3.create();
-        vec3.subtract(s, p, v0);
-        var u = f * vec3.dot(s, h);
-
-        if (u < 0.0 || u > 1.0)
-            continue;
-
-        var q = vec3.create();
-        vec3.cross(q, s, e1);
-        var v = f * vec3.dot(d, q);
-
-        if (v < 0.0 || u+v > 1.0)
-            continue;
-
-        var t = f * vec3.dot(e2, q);
-
-        if ( t > 0.00001)
-        {
-            if (t < min_t)
-            {
-                min_t = t;
-                min_j = j;
-            }
-        }
-        else
-            continue;
-    }
-    return min_t;
-}
-
 Mesh.prototype.draw = function(shader, i)
 {
     var t = this.type[i];
@@ -903,8 +791,6 @@ Mesh.prototype.draw = function(shader, i)
                     this.piece_normals[t], 
                     this.piece_colors[c][t], 
                     this.TRIANGLES); 
-    //this.draw_verts(this.vert[i], this.normal[i], this.color[i], this.TRIANGLES); 
-    //this.draw_verts(this.vert[i], this.LINE_LOOP, this.color[i]); 
 }
 
 function degToRad(degrees) 
