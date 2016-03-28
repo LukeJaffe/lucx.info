@@ -707,6 +707,9 @@ Piece.STATUS =
     FRIEND : 1
 }
 
+Piece.WHITE_KING = 32;
+Piece.BLACK_KING = 39;
+
 /* Piece methods */
 Piece.prototype = 
 {
@@ -889,7 +892,7 @@ Pawn.prototype = Object.create(Piece.prototype,
                 moves.push(this.wf(t1));
 
                 // two spaces ahead is valid if in starting position and empty
-                if (this.start)
+                if (this.start && Piece.teams[this.wf(t1)] == Piece.STATUS.EMPTY)
                     moves.push(this.wf(this.wf(t1)));
             }
             else if (Piece.teams[t2] == Piece.STATUS.ENEMY)
@@ -907,7 +910,7 @@ Pawn.prototype = Object.create(Piece.prototype,
                 moves.push(this.bf(t1));
 
                 // two spaces ahead is valid if in starting position and empty
-                if (this.start)
+                if (this.start && Piece.teams[this.bf(t1)] == Piece.STATUS.EMPTY)
                     moves.push(this.bf(this.bf(t1)));
             }
 
@@ -946,6 +949,7 @@ Rook.INIT_CONSTANTS = function ()
 }
 
 /* Rook methods */
+// You can only castle with rook (not king)
 Rook.prototype = Object.create(Piece.prototype,
 {
     vertices : { value : function() { return Rook.VERTICES; } },
@@ -954,8 +958,123 @@ Rook.prototype = Object.create(Piece.prototype,
 
     legal: { value : function(t2)
     {
+        // get board position of selected piece
         var t1 = Piece.index.indexOf(Piece.selected);
-        return -1;
+        var moves = [];
+
+        // check up
+        var u = t1;
+        while (u >= 0)
+        {
+            // get the next tile up
+            u = this.u(u);
+
+            // tile is the target
+            if (u == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[u] !== Piece.STATUS.FRIEND)
+                    return 0;
+                else
+                    u = -1;
+                // castle not possible for up move
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[u] !== Piece.STATUS.EMPTY)
+            {
+                u = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(u);
+        }
+
+        // check down
+        var d = t1;
+        while (d >= 0)
+        {
+            // get the next tile up
+            d = this.d(d);
+
+            // tile is the target
+            if (d == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[d] !== Piece.STATUS.FRIEND)
+                    return 0;
+                else
+                    d = -1;
+                // castle not possible for up move
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[d] !== Piece.STATUS.EMPTY)
+            {
+                d = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(d);
+        }
+
+        // check left
+        var l = t1;
+        while (l >= 0)
+        {
+            // get the next tile up
+            l = this.l(l);
+
+            // tile is the target
+            if (l == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[l] !== Piece.STATUS.FRIEND)
+                    return 0;
+                // check for castle condition
+                else if (this.start && (l == Piece.WHITE_KING || l == Piece.BLACK_KING))
+                    return 0;
+                else
+                    l = -1;
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[l] !== Piece.STATUS.EMPTY)
+            {
+                l = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(l);
+        }
+
+        // check right
+        var r = t1;
+        while (r >= 0)
+        {
+            // get the next tile up
+            r = this.r(r);
+
+            // tile is the target
+            if (r == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[r] !== Piece.STATUS.FRIEND)
+                    return 0;
+                // check for castle condition
+                else if (this.start && (r == Piece.WHITE_KING || r == Piece.BLACK_KING))
+                    return 0;
+                else
+                    r = -1;
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[r] !== Piece.STATUS.EMPTY)
+            {
+                r = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(r);
+        }
+
+        return moves.indexOf(t2);
     }}
 });
 
