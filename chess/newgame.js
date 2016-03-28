@@ -8,7 +8,7 @@ function degToRad(degrees)
 /* Game class */
 function Game()
 {
-    this.view = new View(gl, this.shader);
+    this.view = new View(Piece.TEAMS.WHITE);
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.enable(gl.DEPTH_TEST);
@@ -90,14 +90,35 @@ Game.prototype.handle_mouse_down = function(event)
             this.view.world.board.selected = -1;
             this.view.clear_selected();
 
-            // move the piece!
-            console.log("t1: "+this.t1+", t2: "+this.t2);
-            dt = this.view.world.board.get_vector(this.t1, this.t2);
-            t = this.view.world.pieces[ps].position;
-            this.view.world.pieces[ps].position = [t[0]+dt[0], t[1]+dt[1], t[2]];
+            // check for castling
+            if (this.view.world.teams[this.t2] == Piece.STATUS.FRIEND)
+            {
+                
+            }
+            else
+            {
+                // kill the enemy piece (if there is one)
+                if (this.view.world.teams[this.t2] == Piece.STATUS.ENEMY)
+                    this.view.world.kill(this.view.world.index[this.t2])
 
-            // update the index of the piece
-            this.view.world.index[this.t2] = this.view.world.index[this.t1];
+                // move the piece!
+                console.log("t1: "+this.t1+", t2: "+this.t2);
+                dt = this.view.world.board.get_vector(this.t1, this.t2);
+                t = this.view.world.pieces[ps].position;
+                this.view.world.pieces[ps].position = [t[0]+dt[0], t[1]+dt[1], t[2]];
+
+                // update the teams
+                this.view.world.teams[this.t2] = Piece.STATUS.FRIEND;
+                // TODO: Friend if castled!
+                this.view.world.teams[this.t1] = Piece.STATUS.EMPTY;
+
+                // update the index of the piece
+                this.view.world.index[this.t2] = this.view.world.index[this.t1];
+                this.view.world.index[this.t1] = -1;
+
+                // update the start variable (even if already 0)
+                this.view.world.pieces[ps].start = 0;
+            }
         }
         return;
     }
@@ -143,8 +164,17 @@ Game.prototype.handle_mouse_move = function(event)
     {
         // Check for mouse collisions with the board
         this.t2 = this.view.board_collision(new_x, new_y);
-        // Check if the piece can move here 
-        this.view.world.board.selected = this.t2;
+        if (this.t2 >= 0)
+        {
+            // Check if the piece can move here 
+            var legal = this.view.world.pieces[Piece.selected].legal(this.t2);
+
+            // if yes, select the tile
+            if (legal >= 0)
+                this.view.world.board.selected = this.t2;
+            else
+                this.view.world.board.selected = -1;
+        }
     }
     else
     {
@@ -211,10 +241,10 @@ Game.prototype.handle_key_up = function(event)
 }
 
 /* View class */
-function View()
+function View(team)
 {
     // world
-    this.world = new World();
+    this.world = new World(team);
 
     // camera
     this.camera = new Camera(gl);
@@ -355,8 +385,11 @@ View.prototype =
 }
 
 
-function World()
+function World(team)
 {
+    // set the team
+    this.team = team;
+
     // matrices
     this.stack = [];
     this.mv = mat4.create();
@@ -365,14 +398,21 @@ function World()
     this.board = new Board();
 
     // chess piece variables
+    this.num = 0;
     this.pieces = [];
     this.index = [];
+    this.teams = [];
     for (var i = 0; i < 8*8; i++)
+    {
         this.index.push(-1);
-    this.num = 0;
-
-    // drawable stuff
-
+        this.teams.push(Piece.STATUS.EMPTY);
+    }
+    
+    // give piece object pointers to needed variables
+    Piece.index = this.index;
+    Piece.team = this.team;
+    Piece.teams = this.teams;
+    
     // add all pieces
     this.add(Piece.TYPES.ROOK,    [1, 1, 0],   0, Piece.TEAMS.WHITE, 0);
     this.add(Piece.TYPES.KNIGHT,  [3, 1, 0],   0, Piece.TEAMS.WHITE, 8);
@@ -427,9 +467,18 @@ World.prototype =
                 break;
         }
         this.index[tile] = this.num;
+        if (this.team == team)
+            this.teams[tile] = Piece.STATUS.FRIEND;
+        else
+            this.teams[tile] = Piece.STATUS.ENEMY;
         this.num++;
     },
 
+    kill : function(i)
+    {
+        console.log("killed!");
+        this.pieces[i].alive = 0;
+    },
 
     clear_mv : function()
     {
@@ -450,7 +499,8 @@ World.prototype =
             throw "Invalid popMatrix!";
         }
         this.mv = this.stack.pop();
-    }
+    },
+
 }
 
 
@@ -612,6 +662,7 @@ function Piece(position, flip, team)
 {
     this.position = position;
     this.flip = flip;
+    this.alive = 1;
 
     // set team and color accordingly
     this.team = team 
@@ -649,6 +700,13 @@ Piece.TEAMS =
     BLACK : 1
 }
 
+Piece.STATUS = 
+{
+    ENEMY : -1,
+    EMPTY : 0,
+    FRIEND : 1
+}
+
 /* Piece methods */
 Piece.prototype = 
 {
@@ -669,8 +727,115 @@ Piece.prototype =
     // TODO: make gl and shader global?
     draw : function(color)
     {
-        shader.draw(this.vertices(), this.normals(), this.colors(color), gl.TRIANGLES);
-    }
+        if (this.alive)
+            shader.draw(this.vertices(), this.normals(), this.colors(color), gl.TRIANGLES);
+    },
+
+    l : function(i)
+    {
+        // left edge
+        if (i < 8)
+            return -1;
+        else
+            return i-8;
+    },
+
+    ul : function(i)
+    {
+        var u = this.u(i);
+        var ul = this.l(u);
+        if (ul < 0 || u < 0)
+            return -1;
+        else
+            return ul;
+    },
+
+    u : function(i)
+    {
+        // top edge
+        if ((i-7)%8 == 0)
+            return -1;
+        else
+            return i+1;
+    },
+
+    ur : function(i)
+    {
+        var u = this.u(i);
+        var ur = this.r(u);
+        if (ur < 0 || u < 0)
+            return -1;
+        else
+            return ur;
+    },
+
+    r : function(i)
+    {
+        // right edge
+        if (i >= 56)
+            return -1;
+        else
+            return i+8;
+    },
+
+    dr : function(i)
+    {
+        var d = this.d(i);
+        var dr = this.r(d);
+        if (dr < 0 || d < 0)
+            return -1;
+        else
+            return dr;
+    },
+
+    d : function(i)
+    {
+        // bottom edge
+        if (i%8 == 0)
+            return -1;
+        else
+            return i-1;
+    },
+
+    dl : function(i)
+    {
+        var d = this.d(i);
+        var dl = this.l(d);
+        if (dl < 0 || d < 0)
+            return -1;
+        else
+            return dl;
+    },
+
+    wf : function(i)
+    {
+        return this.u(i);
+    },
+
+    wfl : function(i)
+    {
+        return this.ul(i);
+    },
+
+    wfr : function(i)
+    {
+        return this.ur(i);
+    },
+
+    bf : function(i)
+    {
+        return this.d(i);
+    },
+
+    bfl : function(i)
+    {
+        return this.dl(i);
+    },
+
+    bfr : function(i)
+    {
+        return this.dr(i);
+    },
 };
 
 /* Piece global attibutes */
@@ -680,6 +845,7 @@ Piece.selected = -1;
 function Pawn(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.start = 1;
 }
 
 /* Pawn constants */
@@ -703,6 +869,60 @@ Pawn.prototype = Object.create(Piece.prototype,
     vertices : { value : function() { return Pawn.VERTICES; } },
     normals : { value : function() { return Pawn.NORMALS; } },
     colors : { value : function(i) { return Pawn.COLORS[i]; } },
+
+    legal: { value : function(t2)
+    {
+        // if friendly is on target, return -1
+        if (Piece.teams[t2] == Piece.STATUS.FRIEND)
+            return -1;
+
+        // get board position of selected piece
+        var t1 = Piece.index.indexOf(Piece.selected);
+        var moves = [];
+
+        // get move forward function, based on team
+        if (Piece.team == Piece.TEAMS.WHITE)
+        {
+            if (Piece.teams[t2] == Piece.STATUS.EMPTY)
+            {
+                // one space ahead is valid if empty
+                moves.push(this.wf(t1));
+
+                // two spaces ahead is valid if in starting position and empty
+                if (this.start)
+                    moves.push(this.wf(this.wf(t1)));
+            }
+            else if (Piece.teams[t2] == Piece.STATUS.ENEMY)
+            {
+                // upper left and upper right are valid if enemy piece is there 
+                if (this.wfl(t1) == t2 || this.wfr(t1) == t2)
+                    moves.push(t2);
+            }
+        }
+        else
+        {
+            if (Piece.teams[t2] == Piece.STATUS.EMPTY)
+            {
+                // one space ahead is valid if empty
+                moves.push(this.bf(t1));
+
+                // two spaces ahead is valid if in starting position and empty
+                if (this.start)
+                    moves.push(this.bf(this.bf(t1)));
+            }
+
+            // upper left and upper right are valid if enemy piece is there 
+            var bfl = this.bfl(t1);
+            if (bfl == t2 && Piece.teams[t2] == Piece.STATUS.ENEMY)
+                moves.push(t2);
+            var bfr = this.bfr(t1);
+            if (bfr == t2 && Piece.teams[t2] == Piece.STATUS.ENEMY)
+                moves.push(t2);
+        }
+
+        // return index of target (-1 if invalid)
+        return moves.indexOf(t2);
+    }}
 });
 
 
@@ -710,6 +930,7 @@ Pawn.prototype = Object.create(Piece.prototype,
 function Rook(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.start = 1;
 }
 
 /* Rook constants */
@@ -730,6 +951,12 @@ Rook.prototype = Object.create(Piece.prototype,
     vertices : { value : function() { return Rook.VERTICES; } },
     normals : { value : function() { return Rook.NORMALS; } },
     colors : { value : function(i) { return Rook.COLORS[i]; } },
+
+    legal: { value : function(t2)
+    {
+        var t1 = Piece.index.indexOf(Piece.selected);
+        return -1;
+    }}
 });
 
 
@@ -757,6 +984,12 @@ Knight.prototype = Object.create(Piece.prototype,
     vertices : { value : function() { return Knight.VERTICES; } },
     normals : { value : function() { return Knight.NORMALS; } },
     colors : { value : function(i) { return Knight.COLORS[i]; } },
+
+    legal: { value : function(t2)
+    {
+        var t1 = Piece.selected;
+        return -1;
+    }}
 });
 
 
@@ -784,6 +1017,12 @@ Bishop.prototype = Object.create(Piece.prototype,
     vertices : { value : function() { return Bishop.VERTICES; } },
     normals : { value : function() { return Bishop.NORMALS; } },
     colors : { value : function(i) { return Bishop.COLORS[i]; } },
+
+    legal: { value : function(t2)
+    {
+        var t1 = Piece.selected;
+        return -1;
+    }}
 });
 
 /* Queen class */
@@ -810,12 +1049,19 @@ Queen.prototype = Object.create(Piece.prototype,
     vertices : { value : function() { return Queen.VERTICES; } },
     normals : { value : function() { return Queen.NORMALS; } },
     colors : { value : function(i) { return Queen.COLORS[i]; } },
+
+    legal: { value : function(t2)
+    {
+        var t1 = Piece.selected;
+        return -1;
+    }}
 });
 
 /* King class */
 function King(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.start = 1;
 }
 
 /* King constants */
@@ -836,4 +1082,10 @@ King.prototype = Object.create(Piece.prototype,
     vertices : { value : function() { return King.VERTICES; } },
     normals : { value : function() { return King.NORMALS; } },
     colors : { value : function(i) { return King.COLORS[i]; } },
+
+    legal: { value : function(t2)
+    {
+        var t1 = Piece.selected;
+        return -1;
+    }}
 });
