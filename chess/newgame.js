@@ -842,6 +842,236 @@ Piece.prototype =
     {
         return this.dr(i);
     },
+
+    horizontal : function(t1, t2)
+    {
+        var moves = [];
+
+        // check up
+        var u = t1;
+        while (u >= 0)
+        {
+            // get the next tile up
+            u = this.u(u);
+
+            // tile is the target
+            if (u == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[u] !== Piece.STATUS.FRIEND)
+                    return 0;
+                else
+                    u = -1;
+                // castle not possible for up move
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[u] !== Piece.STATUS.EMPTY)
+            {
+                u = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(u);
+        }
+
+        // check down
+        var d = t1;
+        while (d >= 0)
+        {
+            // get the next tile up
+            d = this.d(d);
+
+            // tile is the target
+            if (d == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[d] !== Piece.STATUS.FRIEND)
+                    return 0;
+                else
+                    d = -1;
+                // castle not possible for up move
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[d] !== Piece.STATUS.EMPTY)
+            {
+                d = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(d);
+        }
+
+        // check left
+        var l = t1;
+        while (l >= 0)
+        {
+            // get the next tile up
+            l = this.l(l);
+
+            // tile is the target
+            if (l == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[l] !== Piece.STATUS.FRIEND)
+                    return 0;
+                // check for castle condition
+                else if (this.start && (l == Piece.WHITE_KING || l == Piece.BLACK_KING))
+                    return 0;
+                else
+                    l = -1;
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[l] !== Piece.STATUS.EMPTY)
+            {
+                l = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(l);
+        }
+
+        // check right
+        var r = t1;
+        while (r >= 0)
+        {
+            // get the next tile up
+            r = this.r(r);
+
+            // tile is the target
+            if (r == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[r] !== Piece.STATUS.FRIEND)
+                    return 0;
+                // check for castle condition
+                else if (this.start && (r == Piece.WHITE_KING || r == Piece.BLACK_KING))
+                    return 0;
+                else
+                    r = -1;
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[r] !== Piece.STATUS.EMPTY)
+            {
+                r = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(r);
+        }
+
+        return moves.indexOf(t2);
+    },
+
+    diagonal : function(t1, t2)
+    {
+        var moves = [];
+
+        // check up left
+        var ul = t1;
+        while (ul >= 0)
+        {
+            // get the next tile up
+            ul = this.ul(ul);
+
+            // tile is the target
+            if (ul == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[ul] !== Piece.STATUS.FRIEND)
+                    return 0;
+                else
+                    ul = -1;
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[ul] !== Piece.STATUS.EMPTY)
+            {
+                ul = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(ul);
+        }
+
+        // check up right
+        var ur = t1;
+        while (ur >= 0)
+        {
+            // get the next tile up
+            ur = this.ur(ur);
+
+            // tile is the target
+            if (ur == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[ur] !== Piece.STATUS.FRIEND)
+                    return 0;
+                else
+                    ur = -1;
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[ur] !== Piece.STATUS.EMPTY)
+            {
+                ur = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(ur);
+        }
+
+        // check down left
+        var dl = t1;
+        while (dl >= 0)
+        {
+            // get the next tile up
+            dl = this.dl(dl);
+
+            // tile is the target
+            if (dl == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[dl] !== Piece.STATUS.FRIEND)
+                    return 0;
+                else
+                    dl = -1;
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[dl] !== Piece.STATUS.EMPTY)
+            {
+                dl = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(dl);
+        }
+
+        // check down right
+        var dr = t1;
+        while (dr >= 0)
+        {
+            // get the next tile up
+            dr = this.dr(dr);
+
+            // tile is the target
+            if (dr == t2) 
+            {
+                // tile is empty or contains an enemy
+                if (Piece.teams[dr] !== Piece.STATUS.FRIEND)
+                    return 0;
+                else
+                    dr = -1;
+            }
+            // tile is not target and is not empty
+            else if (Piece.teams[dr] !== Piece.STATUS.EMPTY)
+            {
+                dr = -1;
+            }
+
+            // add the move (valid or not) to the moves list
+            moves.push(dr);
+        }
+
+        return moves.indexOf(t2);
+    }
 };
 
 /* Piece global attibutes */
@@ -963,121 +1193,7 @@ Rook.prototype = Object.create(Piece.prototype,
     {
         // get board position of selected piece
         var t1 = Piece.index.indexOf(Piece.selected);
-        var moves = [];
-
-        // check up
-        var u = t1;
-        while (u >= 0)
-        {
-            // get the next tile up
-            u = this.u(u);
-
-            // tile is the target
-            if (u == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[u] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    u = -1;
-                // castle not possible for up move
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[u] !== Piece.STATUS.EMPTY)
-            {
-                u = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(u);
-        }
-
-        // check down
-        var d = t1;
-        while (d >= 0)
-        {
-            // get the next tile up
-            d = this.d(d);
-
-            // tile is the target
-            if (d == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[d] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    d = -1;
-                // castle not possible for up move
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[d] !== Piece.STATUS.EMPTY)
-            {
-                d = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(d);
-        }
-
-        // check left
-        var l = t1;
-        while (l >= 0)
-        {
-            // get the next tile up
-            l = this.l(l);
-
-            // tile is the target
-            if (l == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[l] !== Piece.STATUS.FRIEND)
-                    return 0;
-                // check for castle condition
-                else if (this.start && (l == Piece.WHITE_KING || l == Piece.BLACK_KING))
-                    return 0;
-                else
-                    l = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[l] !== Piece.STATUS.EMPTY)
-            {
-                l = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(l);
-        }
-
-        // check right
-        var r = t1;
-        while (r >= 0)
-        {
-            // get the next tile up
-            r = this.r(r);
-
-            // tile is the target
-            if (r == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[r] !== Piece.STATUS.FRIEND)
-                    return 0;
-                // check for castle condition
-                else if (this.start && (r == Piece.WHITE_KING || r == Piece.BLACK_KING))
-                    return 0;
-                else
-                    r = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[r] !== Piece.STATUS.EMPTY)
-            {
-                r = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(r);
-        }
-
-        return moves.indexOf(t2);
+        return this.horizontal(t1, t2);
     }}
 });
 
@@ -1167,113 +1283,7 @@ Bishop.prototype = Object.create(Piece.prototype,
 
         // get board position of selected piece
         var t1 = Piece.index.indexOf(Piece.selected);
-        var moves = [];
-
-        // check up left
-        var ul = t1;
-        while (ul >= 0)
-        {
-            // get the next tile up
-            ul = this.ul(ul);
-
-            // tile is the target
-            if (ul == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[ul] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    ul = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[ul] !== Piece.STATUS.EMPTY)
-            {
-                ul = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(ul);
-        }
-
-        // check up right
-        var ur = t1;
-        while (ur >= 0)
-        {
-            // get the next tile up
-            ur = this.ur(ur);
-
-            // tile is the target
-            if (ur == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[ur] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    ur = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[ur] !== Piece.STATUS.EMPTY)
-            {
-                ur = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(ur);
-        }
-
-        // check down left
-        var dl = t1;
-        while (dl >= 0)
-        {
-            // get the next tile up
-            dl = this.dl(dl);
-
-            // tile is the target
-            if (dl == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[dl] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    dl = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[dl] !== Piece.STATUS.EMPTY)
-            {
-                dl = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(dl);
-        }
-
-        // check down right
-        var dr = t1;
-        while (dr >= 0)
-        {
-            // get the next tile up
-            dr = this.dr(dr);
-
-            // tile is the target
-            if (dr == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[dr] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    dr = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[dr] !== Piece.STATUS.EMPTY)
-            {
-                dr = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(dr);
-        }
-
-        return moves.indexOf(t2);
+        return this.diagonal(t1, t2);
     }}
 });
 
@@ -1304,8 +1314,16 @@ Queen.prototype = Object.create(Piece.prototype,
 
     legal: { value : function(t2)
     {
-        var t1 = Piece.selected;
-        return -1;
+        // if friendly is on target, return -1
+        if (Piece.teams[t2] == Piece.STATUS.FRIEND)
+            return -1;
+
+        // get board position of selected piece
+        var t1 = Piece.index.indexOf(Piece.selected);
+        if (this.horizontal(t1, t2) >= 0 || this.diagonal(t1, t2) >= 0)
+            return 0;
+        else
+            return -1;
     }}
 });
 
@@ -1337,7 +1355,24 @@ King.prototype = Object.create(Piece.prototype,
 
     legal: { value : function(t2)
     {
-        var t1 = Piece.selected;
-        return -1;
+        // if friendly is on target, return -1
+        if (Piece.teams[t2] == Piece.STATUS.FRIEND)
+            return -1;
+
+        // get board position of selected piece
+        var t1 = Piece.index.indexOf(Piece.selected);
+        var moves = [];
+
+        // can move one in any direction
+        moves.push(this.u(t1));
+        moves.push(this.ur(t1));
+        moves.push(this.r(t1));
+        moves.push(this.dr(t1));
+        moves.push(this.d(t1));
+        moves.push(this.dl(t1));
+        moves.push(this.l(t1));
+        moves.push(this.ul(t1));
+
+        return moves.indexOf(t2);
     }}
 });
