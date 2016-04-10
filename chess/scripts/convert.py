@@ -139,6 +139,23 @@ def gen_board():
             out.write("i++;\n")
     out.write("}\n");
 
+    out.write("function InitBoardSelected(buffers)\n{\n")
+    out.write("var i = 0;\n")
+    for i in range(8):
+        for j in range(8):
+            out.write("buffers.push(gl.createBuffer());\n")
+            out.write("gl.bindBuffer(gl.ARRAY_BUFFER, buffers[i]);\n")
+            out.write("var vertices =\n") 
+            out.write("[\n")
+            for k in range(6):
+                out.write("%f,%f,%f,%f," % (0.600, 0.196, .800, 1))
+            out.write("];\n")
+            out.write("gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);\n")
+            out.write("buffers[i].itemSize = 4;\n");
+            out.write("buffers[i].numItems = 6;\n\n");
+            out.write("i++;\n")
+    out.write("}\n");
+
 def write_vertices(out, mesh, name):
     # Write vertex buffers
     out.write("function Init%sVertices()\n{\n" % name)

@@ -94,33 +94,14 @@ Game.prototype.handle_mouse_down = function(event)
             // TODO: finish
 
             // check for castling
-            if (this.view.world.teams[this.t2] == Piece.STATUS.FRIEND)
+            if (this.view.world.config.teams[this.t2] == Piece.STATUS.FRIEND)
             {
                 // TODO: finish
             }
             else
             {
-                // kill the enemy piece (if there is one)
-                if (this.view.world.teams[this.t2] == Piece.STATUS.ENEMY)
-                    this.view.world.kill(this.view.world.index[this.t2])
-
-                // move the piece!
-                console.log("t1: "+this.t1+", t2: "+this.t2);
                 dt = this.view.world.board.get_vector(this.t1, this.t2);
-                t = this.view.world.pieces[ps].position;
-                this.view.world.pieces[ps].position = [t[0]+dt[0], t[1]+dt[1], t[2]];
-
-                // update the teams
-                this.view.world.teams[this.t2] = Piece.STATUS.FRIEND;
-                // TODO: Friend if castled!
-                this.view.world.teams[this.t1] = Piece.STATUS.EMPTY;
-
-                // update the index of the piece
-                this.view.world.index[this.t2] = this.view.world.index[this.t1];
-                this.view.world.index[this.t1] = -1;
-
-                // update the start variable (even if already 0)
-                this.view.world.pieces[ps].start = 0;
+                this.view.world.config.transform(this.t1, this.t2, dt);
             }
         }
         return;
@@ -128,11 +109,42 @@ Game.prototype.handle_mouse_down = function(event)
 
     if (ps !== -1)
     {
-        if (this.view.world.pieces[ps].team == Piece.TEAMS.WHITE)
-            this.view.world.pieces[ps].color = Piece.COLORS.WHITE_SELECTED;
+        // set the piece to selected color
+        if (this.view.world.config.pieces[ps].team == Piece.TEAMS.WHITE)
+            this.view.world.config.pieces[ps].color = Piece.COLORS.WHITE_SELECTED;
         else
-            this.view.world.pieces[ps].color = Piece.COLORS.BLACK_SELECTED;
+            this.view.world.config.pieces[ps].color = Piece.COLORS.BLACK_SELECTED;
         this.ps = true;
+
+        var t1 = this.view.world.config.index.indexOf(ps);
+
+        // calculate all possible moves for the piece excluding check scenarios
+        this.moves = this.view.world.config.pieces[ps].moves(this.view.world.config, t1);
+
+        // prune -1s from moves
+        var i;
+        while ((i = this.moves.indexOf(-1)) !== -1)
+            this.moves.splice(i, 1);
+
+        // for all possible moves, check each move to see if it puts you in check
+        // get all enemy pieces
+        /*
+        var config;
+        enemy_moves = [];
+        for (i = 0; i < this.view.world.config.pieces.length; i++)
+        {
+            if (this.view.world.config.teams[i] != this.team)
+            {
+                config = this.view.world.config.clone(); 
+                enemy_moves.push(this.view.world.config.pieces[i].moves(config), t1);
+            }
+        }       
+        console.log(enemy_moves);
+        */
+
+        // show possible moves on the board
+        for (var i = 0; i < this.moves.length; i++)
+            this.view.world.board.options[this.moves[i]] = 1;
     }
 }
 
@@ -170,11 +182,15 @@ Game.prototype.handle_mouse_move = function(event)
         if (this.t2 >= 0)
         {
             // Check if the piece can move here 
-            var legal = this.view.world.pieces[Piece.selected].legal(this.t2);
+            //var legal = this.view.world.config.pieces[Piece.selected].legal(this.t2);
 
             // if yes, select the tile
-            if (legal >= 0)
-                this.view.world.board.selected = this.t2;
+            //if (legal >= 0)
+            //    this.view.world.board.selected = this.t2;
+            //else
+            //    this.view.world.board.selected = -1;
+            if (this.moves.indexOf(this.t2) >= 0)
+                this.view.world.board.selected = this.t2
             else
                 this.view.world.board.selected = -1;
         }
@@ -292,16 +308,16 @@ View.prototype =
         this.world.pop_mv();
 
         // draw world objects
-        for (var i = 0; i < this.world.pieces.length; i++)
+        for (var i = 0; i < this.world.config.pieces.length; i++)
         {
             // push the current mv matrix on the stack
             this.world.push_mv();
             // set the mv matrix for mesh i
-            this.world.pieces[i].move(this.world.mv);
+            this.world.config.pieces[i].move(this.world.mv);
             // set the shader matrices
             this.set();
             // draw the mesh
-            this.world.pieces[i].draw(this.world.pieces[i].color);
+            this.world.config.pieces[i].draw(this.world.config.pieces[i].color);
             // pop the top mv matrix off the stack
             this.world.pop_mv();
         }
@@ -324,21 +340,21 @@ View.prototype =
 
         // test for collision with all tiles
         var t = this.world.board.collision(this.camera.vm(), this.cursor.p, this.cursor.d)
-        var s = this.world.index[t];
+        var s = this.world.config.index[t];
         Piece.selected = -1;
-        for (var i = 0; i < this.world.pieces.length; i++)
+        for (var i = 0; i < this.world.config.pieces.length; i++)
         {
             if (i == s)
             {
-                if (this.world.pieces[i].team == Piece.COLORS.WHITE)
-                    this.world.pieces[i].color = Piece.COLORS.WHITE_HOVER;
+                if (this.world.config.pieces[i].team == Piece.COLORS.WHITE)
+                    this.world.config.pieces[i].color = Piece.COLORS.WHITE_HOVER;
                 else
-                    this.world.pieces[i].color = Piece.COLORS.BLACK_HOVER;
+                    this.world.config.pieces[i].color = Piece.COLORS.BLACK_HOVER;
                 Piece.selected = i;
             }
             else
             {
-                this.world.pieces[i].color = this.world.pieces[i].team*3;
+                this.world.config.pieces[i].color = this.world.config.pieces[i].team*3;
             }
         }
         return t;
@@ -380,27 +396,24 @@ View.prototype =
     clear_selected : function()
     {
         Piece.selected = -1;
-        for (var i = 0; i < this.world.pieces.length; i++)
+        for (var i = 0; i < this.world.config.pieces.length; i++)
         {
-            this.world.pieces[i].color = this.world.pieces[i].team*3;
+            this.world.config.pieces[i].color = this.world.config.pieces[i].team*3;
+        }
+
+        for (var i = 0; i < this.world.board.NUM_TILES; i++)
+        {
+            this.world.board.options[i] = 0;
         }
     },
 }
 
-
-function World(team)
+function Config(team)
 {
+    // chess piece variables
     // set the team
     this.team = team;
 
-    // matrices
-    this.stack = [];
-    this.mv = mat4.create();
-
-    // chess board
-    this.board = new Board();
-
-    // chess piece variables
     this.num = 0;
     this.pieces = [];
     this.index = [];
@@ -410,39 +423,9 @@ function World(team)
         this.index.push(-1);
         this.teams.push(Piece.STATUS.EMPTY);
     }
-    
-    // give piece object pointers to needed variables
-    Piece.index = this.index;
-    Piece.team = this.team;
-    Piece.teams = this.teams;
-    
-    // add all pieces
-    this.add(Piece.TYPES.ROOK,    [1, 1, 0],   0, Piece.TEAMS.WHITE, 0);
-    this.add(Piece.TYPES.KNIGHT,  [3, 1, 0],   0, Piece.TEAMS.WHITE, 8);
-    this.add(Piece.TYPES.BISHOP,  [5, 1, 0],   0, Piece.TEAMS.WHITE, 16);
-    this.add(Piece.TYPES.QUEEN,   [7, 1, 0],   0, Piece.TEAMS.WHITE, 24);
-    this.add(Piece.TYPES.KING,    [9, 1, 0],   0, Piece.TEAMS.WHITE, 32);
-    this.add(Piece.TYPES.BISHOP,  [11, 1, 0],  0, Piece.TEAMS.WHITE, 40);
-    this.add(Piece.TYPES.KNIGHT,  [13, 1, 0],  0, Piece.TEAMS.WHITE, 48);
-    this.add(Piece.TYPES.ROOK,    [15, 1, 0],  0, Piece.TEAMS.WHITE, 56);
-
-    this.add(Piece.TYPES.ROOK,    [1, 15, 0],  0, Piece.TEAMS.BLACK, 7);
-    this.add(Piece.TYPES.KNIGHT,  [3, 15, 0],  1, Piece.TEAMS.BLACK, 15);
-    this.add(Piece.TYPES.BISHOP,  [5, 15, 0],  1, Piece.TEAMS.BLACK, 23);
-    this.add(Piece.TYPES.QUEEN,   [7, 15, 0],  0, Piece.TEAMS.BLACK, 31);
-    this.add(Piece.TYPES.KING,    [9, 15, 0],  0, Piece.TEAMS.BLACK, 39);
-    this.add(Piece.TYPES.BISHOP,  [11, 15, 0], 1, Piece.TEAMS.BLACK, 47);
-    this.add(Piece.TYPES.KNIGHT,  [13, 15, 0], 1, Piece.TEAMS.BLACK, 55);
-    this.add(Piece.TYPES.ROOK,    [15, 15, 0], 0, Piece.TEAMS.BLACK, 63);
-
-    for (var i = 0; i < 8; i++)
-        this.add(Piece.TYPES.PAWN, [2*i+1, 3, 0], 0, Piece.TEAMS.WHITE, (8*i)+1);
-
-    for (var i = 0; i < 8; i++)
-        this.add(Piece.TYPES.PAWN, [2*i+1, 13, 0], 0, Piece.TEAMS.BLACK, (8*i)+6);
 }
 
-World.prototype = 
+Config.prototype = 
 {
     add : function(type, position, flip, team, tile)
     {
@@ -470,10 +453,7 @@ World.prototype =
                 break;
         }
         this.index[tile] = this.num;
-        if (this.team == team)
-            this.teams[tile] = Piece.STATUS.FRIEND;
-        else
-            this.teams[tile] = Piece.STATUS.ENEMY;
+        this.teams[tile] = team;
         this.num++;
     },
 
@@ -483,6 +463,95 @@ World.prototype =
         this.pieces[i].alive = 0;
     },
 
+    transform : function(t1, t2, dt)
+    {
+        // get the selected piece
+        ps = this.index[t1];
+
+        // kill the enemy piece (if there is one)
+        if (this.teams[t2] != this.teams[t1] && this.teams[t2] != Piece.STATUS.EMPTY)
+            this.kill(this.index[t2])
+
+        // move the piece!
+        console.log("ps: "+ps+", t1: "+t1+", t2: "+t2+", "+this.index[t1]);
+        t = this.pieces[ps].position;
+        this.pieces[ps].position = [t[0]+dt[0], t[1]+dt[1], t[2]];
+
+        // update the teams
+        this.teams[t2] = this.pieces[ps].team;
+        // TODO: Friend if castled!
+        this.teams[t1] = Piece.STATUS.EMPTY;
+
+        // update the index of the piece
+        this.index[t2] = this.index[t1];
+        this.index[t1] = -1;
+
+        // update the start variable (even if already 0)
+        this.pieces[ps].start = 0;
+    },
+
+    init : function()
+    {
+        // add all pieces
+        this.add(Piece.TYPES.ROOK,    [1, 1, 0],   0, Piece.TEAMS.WHITE, 0);
+        this.add(Piece.TYPES.KNIGHT,  [3, 1, 0],   0, Piece.TEAMS.WHITE, 8);
+        this.add(Piece.TYPES.BISHOP,  [5, 1, 0],   0, Piece.TEAMS.WHITE, 16);
+        this.add(Piece.TYPES.QUEEN,   [7, 1, 0],   0, Piece.TEAMS.WHITE, 24);
+        this.add(Piece.TYPES.KING,    [9, 1, 0],   0, Piece.TEAMS.WHITE, 32);
+        this.add(Piece.TYPES.BISHOP,  [11, 1, 0],  0, Piece.TEAMS.WHITE, 40);
+        this.add(Piece.TYPES.KNIGHT,  [13, 1, 0],  0, Piece.TEAMS.WHITE, 48);
+        this.add(Piece.TYPES.ROOK,    [15, 1, 0],  0, Piece.TEAMS.WHITE, 56);
+
+        this.add(Piece.TYPES.ROOK,    [1, 15, 0],  0, Piece.TEAMS.BLACK, 7);
+        this.add(Piece.TYPES.KNIGHT,  [3, 15, 0],  1, Piece.TEAMS.BLACK, 15);
+        this.add(Piece.TYPES.BISHOP,  [5, 15, 0],  1, Piece.TEAMS.BLACK, 23);
+        this.add(Piece.TYPES.QUEEN,   [7, 15, 0],  0, Piece.TEAMS.BLACK, 31);
+        this.add(Piece.TYPES.KING,    [9, 15, 0],  0, Piece.TEAMS.BLACK, 39);
+        this.add(Piece.TYPES.BISHOP,  [11, 15, 0], 1, Piece.TEAMS.BLACK, 47);
+        this.add(Piece.TYPES.KNIGHT,  [13, 15, 0], 1, Piece.TEAMS.BLACK, 55);
+        this.add(Piece.TYPES.ROOK,    [15, 15, 0], 0, Piece.TEAMS.BLACK, 63);
+
+        for (var i = 0; i < 8; i++)
+            this.add(Piece.TYPES.PAWN, [2*i+1, 3, 0], 0, Piece.TEAMS.WHITE, (8*i)+1);
+
+        for (var i = 0; i < 8; i++)
+            this.add(Piece.TYPES.PAWN, [2*i+1, 13, 0], 0, Piece.TEAMS.BLACK, (8*i)+6);
+    },
+
+    clone : function() 
+    {
+        newc = new Config();
+        newc.num = this.num;
+        newc.index = this.index.slice(0);
+        newc.teams = this.teams.slice(0);    
+        newc.pieces = []
+        for (var i = 0; i < this.pieces.length; i++)
+            newc.pieces.push(this.pieces[i].clone());
+        return newc;
+    }
+}
+
+function World(team)
+{
+    // matrices
+    this.stack = [];
+    this.mv = mat4.create();
+
+    // chess board
+    this.board = new Board();
+
+    // primary configuration
+    this.config = new Config(team);
+    this.config.init();
+
+    // give piece object pointers to needed variables
+    Piece.index = this.config.index;
+    Piece.teams = this.config.teams;
+    Piece.team = this.config.team;
+}
+
+World.prototype = 
+{
     clear_mv : function()
     {
         mat4.identity(this.mv);
@@ -503,7 +572,6 @@ World.prototype =
         }
         this.mv = this.stack.pop();
     },
-
 }
 
 
@@ -558,8 +626,14 @@ function Board()
     this.shaded = [];
     InitBoardShaded(this.shaded);
 
+    this.picked = [];
+    InitBoardSelected(this.picked);
+
     this.NUM_TILES = 64;
     this.selected = -1;
+    this.options = [];
+    for (var i = 0; i < this.NUM_TILES; i++)
+        this.options.push(0);
 }
 
 Board.prototype.set_mv = function(mv)
@@ -579,6 +653,8 @@ Board.prototype.draw = function()
     for (var i = 0; i < this.NUM_TILES; i++)
     {
         if (this.selected == i)
+            shader.draw(this.vertices[i], this.normals[i], this.picked[i], gl.TRIANGLES); 
+        else if (this.options[i])
             shader.draw(this.vertices[i], this.normals[i], this.shaded[i], gl.TRIANGLES); 
         else
             shader.draw(this.vertices[i], this.normals[i], this.colors[i], gl.TRIANGLES); 
@@ -668,7 +744,7 @@ function Piece(position, flip, team)
     this.alive = 1;
 
     // set team and color accordingly
-    this.team = team 
+    this.team = team;
     if (this.team == Piece.TEAMS.WHITE)
         this.color = Piece.COLORS.WHITE;
     else
@@ -705,9 +781,9 @@ Piece.TEAMS =
 
 Piece.STATUS = 
 {
-    ENEMY : -1,
-    EMPTY : 0,
-    FRIEND : 1
+    WHITE : 0,
+    BLACK : 1,
+    EMPTY : 2
 }
 
 Piece.WHITE_KING = 32;
@@ -716,6 +792,13 @@ Piece.BLACK_KING = 39;
 /* Piece methods */
 Piece.prototype = 
 {
+    clone : function()
+    {
+        var newp = new Piece(this.position, this.flip, this.team);
+        newp.alive = this.alive;
+        return newp;
+    },
+
     // Empty methods: must be implemented in child
     vertices : function() { return null; },
     normals : function() { return null; },
@@ -759,7 +842,7 @@ Piece.prototype =
     u : function(i)
     {
         // top edge
-        if ((i-7)%8 == 0)
+        if ((i-7)%8 == 0 || i < 0)
             return -1;
         else
             return i+1;
@@ -778,7 +861,7 @@ Piece.prototype =
     r : function(i)
     {
         // right edge
-        if (i >= 56)
+        if (i >= 56 || i < 0)
             return -1;
         else
             return i+8;
@@ -797,7 +880,7 @@ Piece.prototype =
     d : function(i)
     {
         // bottom edge
-        if (i%8 == 0)
+        if (i%8 == 0 || i < 0)
             return -1;
         else
             return i-1;
@@ -843,129 +926,111 @@ Piece.prototype =
         return this.dr(i);
     },
 
-    horizontal : function(t1, t2)
+    horizontal : function(t1, moves, config)
     {
-        var moves = [];
-
-        // check up
+        // check up left
         var u = t1;
         while (u >= 0)
         {
             // get the next tile up
             u = this.u(u);
 
-            // tile is the target
-            if (u == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[u] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    u = -1;
-                // castle not possible for up move
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[u] !== Piece.STATUS.EMPTY)
+            // tile has friend
+            if (config.teams[u] == this.team)
             {
                 u = -1;
             }
-
-            // add the move (valid or not) to the moves list
-            moves.push(u);
+            // tile has enemy
+            else if (config.teams[u] != this.team && config.teams[u] != Piece.STATUS.EMPTY)
+            {
+                moves.push(u);
+                u = -1;
+            }
+            // tile is empty
+            else
+            {
+                moves.push(u);
+            }
         }
 
-        // check down
-        var d = t1;
-        while (d >= 0)
-        {
-            // get the next tile up
-            d = this.d(d);
-
-            // tile is the target
-            if (d == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[d] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    d = -1;
-                // castle not possible for up move
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[d] !== Piece.STATUS.EMPTY)
-            {
-                d = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(d);
-        }
-
-        // check left
-        var l = t1;
-        while (l >= 0)
-        {
-            // get the next tile up
-            l = this.l(l);
-
-            // tile is the target
-            if (l == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[l] !== Piece.STATUS.FRIEND)
-                    return 0;
-                // check for castle condition
-                else if (this.start && (l == Piece.WHITE_KING || l == Piece.BLACK_KING))
-                    return 0;
-                else
-                    l = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[l] !== Piece.STATUS.EMPTY)
-            {
-                l = -1;
-            }
-
-            // add the move (valid or not) to the moves list
-            moves.push(l);
-        }
-
-        // check right
+        // check up right
         var r = t1;
         while (r >= 0)
         {
             // get the next tile up
             r = this.r(r);
 
-            // tile is the target
-            if (r == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[r] !== Piece.STATUS.FRIEND)
-                    return 0;
-                // check for castle condition
-                else if (this.start && (r == Piece.WHITE_KING || r == Piece.BLACK_KING))
-                    return 0;
-                else
-                    r = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[r] !== Piece.STATUS.EMPTY)
+            // tile has friend
+            if (config.teams[r] == this.team)
             {
                 r = -1;
             }
-
-            // add the move (valid or not) to the moves list
-            moves.push(r);
+            // tile has enemy
+            else if (config.teams[r] != this.team && config.teams[r] != Piece.STATUS.EMPTY)
+            {
+                moves.push(r);
+                r = -1;
+            }
+            // tile is empty
+            else
+            {
+                moves.push(r);
+            }
         }
 
-        return moves.indexOf(t2);
+        // check down left
+        var l = t1;
+        while (l >= 0)
+        {
+            // get the next tile up
+            l = this.l(l);
+
+            // tile has friend
+            if (config.teams[l] == this.team)
+            {
+                l = -1;
+            }
+            // tile has enemy
+            else if (config.teams[l] != this.team && config.teams[l] != Piece.STATUS.EMPTY)
+            {
+                moves.push(l);
+                l = -1;
+            }
+            // tile is empty
+            else
+            {
+                moves.push(l);
+            }
+        }
+
+        // check down right
+        var d = t1;
+        while (d >= 0)
+        {
+            // get the next tile up
+            d = this.d(d);
+
+            // tile has friend
+            if (config.teams[d] == this.team)
+            {
+                d = -1;
+            }
+            // tile has enemy
+            else if (config.teams[d] != this.team && config.teams[d] != Piece.STATUS.EMPTY)
+            {
+                moves.push(d);
+                d = -1;
+            }
+            // tile is empty
+            else
+            {
+                moves.push(d);
+            }
+        }
     },
-
-    diagonal : function(t1, t2)
+    
+    diagonal : function(t1, moves, config)
     {
-        var moves = [];
-
         // check up left
         var ul = t1;
         while (ul >= 0)
@@ -973,23 +1038,22 @@ Piece.prototype =
             // get the next tile up
             ul = this.ul(ul);
 
-            // tile is the target
-            if (ul == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[ul] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    ul = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[ul] !== Piece.STATUS.EMPTY)
+            // tile has friend
+            if (config.teams[ul] == this.team)
             {
                 ul = -1;
             }
-
-            // add the move (valid or not) to the moves list
-            moves.push(ul);
+            // tile has enemy
+            else if (config.teams[ul] != this.team && config.teams[ul] != Piece.STATUS.EMPTY)
+            {
+                moves.push(ul);
+                ul = -1;
+            }
+            // tile is empty
+            else
+            {
+                moves.push(ul);
+            }
         }
 
         // check up right
@@ -999,23 +1063,22 @@ Piece.prototype =
             // get the next tile up
             ur = this.ur(ur);
 
-            // tile is the target
-            if (ur == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[ur] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    ur = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[ur] !== Piece.STATUS.EMPTY)
+            // tile has friend
+            if (config.teams[ur] == this.team)
             {
                 ur = -1;
             }
-
-            // add the move (valid or not) to the moves list
-            moves.push(ur);
+            // tile has enemy
+            else if (config.teams[ur] != this.team && config.teams[ur] != Piece.STATUS.EMPTY)
+            {
+                moves.push(ur);
+                ur = -1;
+            }
+            // tile is empty
+            else
+            {
+                moves.push(ur);
+            }
         }
 
         // check down left
@@ -1025,23 +1088,22 @@ Piece.prototype =
             // get the next tile up
             dl = this.dl(dl);
 
-            // tile is the target
-            if (dl == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[dl] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    dl = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[dl] !== Piece.STATUS.EMPTY)
+            // tile has friend
+            if (config.teams[dl] == this.team)
             {
                 dl = -1;
             }
-
-            // add the move (valid or not) to the moves list
-            moves.push(dl);
+            // tile has enemy
+            else if (config.teams[dl] != this.team && config.teams[dl] != Piece.STATUS.EMPTY)
+            {
+                moves.push(dl);
+                dl = -1;
+            }
+            // tile is empty
+            else
+            {
+                moves.push(dl);
+            }
         }
 
         // check down right
@@ -1051,26 +1113,23 @@ Piece.prototype =
             // get the next tile up
             dr = this.dr(dr);
 
-            // tile is the target
-            if (dr == t2) 
-            {
-                // tile is empty or contains an enemy
-                if (Piece.teams[dr] !== Piece.STATUS.FRIEND)
-                    return 0;
-                else
-                    dr = -1;
-            }
-            // tile is not target and is not empty
-            else if (Piece.teams[dr] !== Piece.STATUS.EMPTY)
+            // tile has friend
+            if (config.teams[dr] == this.team)
             {
                 dr = -1;
             }
-
-            // add the move (valid or not) to the moves list
-            moves.push(dr);
+            // tile has enemy
+            else if (config.teams[dr] != this.team && config.teams[dr] != Piece.STATUS.EMPTY)
+            {
+                moves.push(dr);
+                dr = -1;
+            }
+            // tile is empty
+            else
+            {
+                moves.push(dr);
+            }
         }
-
-        return moves.indexOf(t2);
     }
 };
 
@@ -1106,58 +1165,52 @@ Pawn.prototype = Object.create(Piece.prototype,
     normals : { value : function() { return Pawn.NORMALS; } },
     colors : { value : function(i) { return Pawn.COLORS[i]; } },
 
-    legal: { value : function(t2)
+    moves: { value : function(config, t1)
     {
-        // if friendly is on target, return -1
-        if (Piece.teams[t2] == Piece.STATUS.FRIEND)
-            return -1;
-
-        // get board position of selected piece
-        var t1 = Piece.index.indexOf(Piece.selected);
         var moves = [];
 
-        // get move forward function, based on team
-        if (Piece.team == Piece.TEAMS.WHITE)
+        if (this.team == Piece.TEAMS.WHITE)
         {
-            if (Piece.teams[t2] == Piece.STATUS.EMPTY)
+            // forward moves
+            var f = this.wf(t1);
+            if (config.teams[f] == Piece.STATUS.EMPTY)
             {
-                // one space ahead is valid if empty
-                moves.push(this.wf(t1));
+                moves.push(f);
+                var ff = this.wf(f);
+                if (this.start && config.teams[ff] == Piece.STATUS.EMPTY)
+                    moves.push(ff);
+            }
 
-                // two spaces ahead is valid if in starting position and empty
-                if (this.start && Piece.teams[this.wf(t1)] == Piece.STATUS.EMPTY)
-                    moves.push(this.wf(this.wf(t1)));
-            }
-            else if (Piece.teams[t2] == Piece.STATUS.ENEMY)
-            {
-                // upper left and upper right are valid if enemy piece is there 
-                if (this.wfl(t1) == t2 || this.wfr(t1) == t2)
-                    moves.push(t2);
-            }
+            // diagonal moves
+            var fl = this.wfl(t1);
+            if (config.teams[fl] == Piece.STATUS.BLACK)
+                moves.push(fl);
+            var fr = this.wfr(t1);
+            if (config.teams[fr] == Piece.STATUS.BLACK)
+                moves.push(fr);
         }
         else
         {
-            if (Piece.teams[t2] == Piece.STATUS.EMPTY)
+            // forward moves
+            var f = this.bf(t1);
+            if (config.teams[f] == Piece.STATUS.EMPTY)
             {
-                // one space ahead is valid if empty
-                moves.push(this.bf(t1));
-
-                // two spaces ahead is valid if in starting position and empty
-                if (this.start && Piece.teams[this.bf(t1)] == Piece.STATUS.EMPTY)
-                    moves.push(this.bf(this.bf(t1)));
+                moves.push(f);
+                var ff = this.bf(f);
+                if (this.start && config.teams[ff] == Piece.STATUS.EMPTY)
+                    moves.push(ff);
             }
 
-            // upper left and upper right are valid if enemy piece is there 
-            var bfl = this.bfl(t1);
-            if (bfl == t2 && Piece.teams[t2] == Piece.STATUS.ENEMY)
-                moves.push(t2);
-            var bfr = this.bfr(t1);
-            if (bfr == t2 && Piece.teams[t2] == Piece.STATUS.ENEMY)
-                moves.push(t2);
+            // diagonal moves
+            var fl = this.bfl(t1);
+            if (config.teams[fl] == Piece.STATUS.WHITE)
+                moves.push(fl);
+            var fr = this.bfr(t1);
+            if (config.teams[fr] == Piece.STATUS.WHITE)
+                moves.push(fr);
         }
 
-        // return index of target (-1 if invalid)
-        return moves.indexOf(t2);
+        return moves;
     }}
 });
 
@@ -1189,11 +1242,14 @@ Rook.prototype = Object.create(Piece.prototype,
     normals : { value : function() { return Rook.NORMALS; } },
     colors : { value : function(i) { return Rook.COLORS[i]; } },
 
-    legal: { value : function(t2)
+    moves: { value : function(config, t1)
     {
-        // get board position of selected piece
-        var t1 = Piece.index.indexOf(Piece.selected);
-        return this.horizontal(t1, t2);
+        moves = [];
+
+        // check all horizontal moves
+        this.horizontal(t1, moves, config);
+
+        return moves;
     }}
 });
 
@@ -1223,14 +1279,8 @@ Knight.prototype = Object.create(Piece.prototype,
     normals : { value : function() { return Knight.NORMALS; } },
     colors : { value : function(i) { return Knight.COLORS[i]; } },
 
-    legal: { value : function(t2)
+    moves: { value : function(config, t1)
     {
-        // if friendly is on target, return -1
-        if (Piece.teams[t2] == Piece.STATUS.FRIEND)
-            return -1;
-
-        // get board position of selected piece
-        var t1 = Piece.index.indexOf(Piece.selected);
         var moves = [];
 
         moves.push(this.l(this.l(this.u(t1))));
@@ -1245,7 +1295,11 @@ Knight.prototype = Object.create(Piece.prototype,
         moves.push(this.r(this.r(this.d(t1))));
         moves.push(this.d(this.d(this.r(t1))));
 
-        return moves.indexOf(t2);
+        for (var i = 0; i < moves.length; i++)
+            if (config.teams[moves[i]] == this.team) 
+                moves[i] = -1;
+
+        return moves;
     }}
 });
 
@@ -1275,15 +1329,14 @@ Bishop.prototype = Object.create(Piece.prototype,
     normals : { value : function() { return Bishop.NORMALS; } },
     colors : { value : function(i) { return Bishop.COLORS[i]; } },
 
-    legal: { value : function(t2)
+    moves: { value : function(config, t1)
     {
-        // if friendly is on target, return -1
-        if (Piece.teams[t2] == Piece.STATUS.FRIEND)
-            return -1;
+        moves = [];
 
-        // get board position of selected piece
-        var t1 = Piece.index.indexOf(Piece.selected);
-        return this.diagonal(t1, t2);
+        // check all diagonal moves
+        this.diagonal(t1, moves, config);
+
+        return moves;
     }}
 });
 
@@ -1312,18 +1365,16 @@ Queen.prototype = Object.create(Piece.prototype,
     normals : { value : function() { return Queen.NORMALS; } },
     colors : { value : function(i) { return Queen.COLORS[i]; } },
 
-    legal: { value : function(t2)
+    moves: { value : function(config, t1)
     {
-        // if friendly is on target, return -1
-        if (Piece.teams[t2] == Piece.STATUS.FRIEND)
-            return -1;
-
         // get board position of selected piece
-        var t1 = Piece.index.indexOf(Piece.selected);
-        if (this.horizontal(t1, t2) >= 0 || this.diagonal(t1, t2) >= 0)
-            return 0;
-        else
-            return -1;
+        moves = [];
+        
+        // check all horizontal and diagonal positions
+        this.horizontal(t1, moves, config);
+        this.diagonal(t1, moves, config);
+
+        return moves;
     }}
 });
 
@@ -1353,14 +1404,8 @@ King.prototype = Object.create(Piece.prototype,
     normals : { value : function() { return King.NORMALS; } },
     colors : { value : function(i) { return King.COLORS[i]; } },
 
-    legal: { value : function(t2)
+    moves: { value : function(config, t1)
     {
-        // if friendly is on target, return -1
-        if (Piece.teams[t2] == Piece.STATUS.FRIEND)
-            return -1;
-
-        // get board position of selected piece
-        var t1 = Piece.index.indexOf(Piece.selected);
         var moves = [];
 
         // can move one in any direction
@@ -1373,6 +1418,13 @@ King.prototype = Object.create(Piece.prototype,
         moves.push(this.l(t1));
         moves.push(this.ul(t1));
 
-        return moves.indexOf(t2);
+        for (var i = 0; i < moves.length; i++)
+        {
+            var m = config.teams[moves[i]];
+            if (m == this.team || m == -1) 
+                moves[i] = -1;
+        }
+
+        return moves;
     }}
 });
