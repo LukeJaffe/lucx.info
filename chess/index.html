@@ -7,10 +7,17 @@
 <script type="text/javascript" src="gl-matrix.js"></script>
 <script type="text/javascript" src="webgl-utils.js"></script>
 
+<script type="text/javascript" src="utils.js"></script>
 <script type="text/javascript" src="verts.js"></script>
 <script type="text/javascript" src="shader.js"></script>
 <script type="text/javascript" src="cursor.js"></script>
-<script type="text/javascript" src="newgame.js"></script>
+<script type="text/javascript" src="piece.js"></script>
+<script type="text/javascript" src="board.js"></script>
+<script type="text/javascript" src="view.js"></script>
+<script type="text/javascript" src="config.js"></script>
+<script type="text/javascript" src="world.js"></script>
+<script type="text/javascript" src="camera.js"></script>
+<script type="text/javascript" src="game.js"></script>
 
 <script id="shader-fs" type="x-shader/x-fragment">
     precision mediump float;
@@ -63,7 +70,7 @@
 </script>
 
 <script>
-    var gl, shader, game;
+    var gl, shader;
 
     function webGLStart() 
     {
@@ -92,7 +99,7 @@
         King.INIT_CONSTANTS();
 
         // Main game object
-        game = new Game();
+        var game = new Game();
 
         // program mouse events
         canvas.onmousedown = game.handle_mouse_down.bind(game);
