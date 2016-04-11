@@ -63,7 +63,7 @@
 </script>
 
 <script>
-    var gl, shader;
+    var gl, shader, game;
 
     function webGLStart() 
     {
@@ -92,7 +92,7 @@
         King.INIT_CONSTANTS();
 
         // Main game object
-        var game = new Game();
+        game = new Game();
 
         // program mouse events
         canvas.onmousedown = game.handle_mouse_down.bind(game);

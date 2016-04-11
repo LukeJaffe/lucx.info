@@ -8,7 +8,8 @@ function degToRad(degrees)
 /* Game class */
 function Game()
 {
-    this.view = new View(Piece.TEAMS.WHITE);
+    this.team = Piece.TEAMS.WHITE;
+    this.view = new View(this.team);
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.enable(gl.DEPTH_TEST);
@@ -102,6 +103,7 @@ Game.prototype.handle_mouse_down = function(event)
             {
                 dt = this.view.world.board.get_vector(this.t1, this.t2);
                 this.view.world.config.transform(this.t1, this.t2, dt);
+                console.log("taken move: " + this.t1 + " -> "+ this.t2);
             }
         }
         return;
@@ -121,26 +123,26 @@ Game.prototype.handle_mouse_down = function(event)
         // calculate all possible moves for the piece excluding check scenarios
         this.moves = this.view.world.config.pieces[ps].moves(this.view.world.config, t1);
 
-        // prune -1s from moves
-        var i;
-        while ((i = this.moves.indexOf(-1)) !== -1)
-            this.moves.splice(i, 1);
-
         // for all possible moves, check each move to see if it puts you in check
-        // get all enemy pieces
-        /*
-        var config;
-        enemy_moves = [];
-        for (i = 0; i < this.view.world.config.pieces.length; i++)
+        for (var i = 0; i < this.moves.length; i++)
         {
-            if (this.view.world.config.teams[i] != this.team)
+            // copy the current config into a new one
+            var config = this.view.world.config.clone(); 
+
+            // transform the config for the current move option
+            config.transform(t1, this.moves[i], null);
+
+            var king_pos = config.king_pos(this.team); 
+            for (var j = 0; j < config.pieces.length; j++)
             {
-                config = this.view.world.config.clone(); 
-                enemy_moves.push(this.view.world.config.pieces[i].moves(config), t1);
-            }
-        }       
-        console.log(enemy_moves);
-        */
+                if (config.pieces[j].team != this.team)
+                {
+                    var moves = config.pieces[j].moves(config, config.index.indexOf(j));
+                    if (moves.indexOf(king_pos) !== -1)
+                        this.moves[i] = -1;
+                }
+            }       
+        }
 
         // show possible moves on the board
         for (var i = 0; i < this.moves.length; i++)
@@ -459,7 +461,7 @@ Config.prototype =
 
     kill : function(i)
     {
-        console.log("killed!");
+        //console.log("killed: "+ i);
         this.pieces[i].alive = 0;
     },
 
@@ -473,9 +475,11 @@ Config.prototype =
             this.kill(this.index[t2])
 
         // move the piece!
-        console.log("ps: "+ps+", t1: "+t1+", t2: "+t2+", "+this.index[t1]);
-        t = this.pieces[ps].position;
-        this.pieces[ps].position = [t[0]+dt[0], t[1]+dt[1], t[2]];
+        if (dt !== null)
+        {
+            t = this.pieces[ps].position;
+            this.pieces[ps].position = [t[0]+dt[0], t[1]+dt[1], t[2]];
+        }
 
         // update the teams
         this.teams[t2] = this.pieces[ps].team;
@@ -520,7 +524,7 @@ Config.prototype =
 
     clone : function() 
     {
-        newc = new Config();
+        var newc = new Config();
         newc.num = this.num;
         newc.index = this.index.slice(0);
         newc.teams = this.teams.slice(0);    
@@ -528,6 +532,14 @@ Config.prototype =
         for (var i = 0; i < this.pieces.length; i++)
             newc.pieces.push(this.pieces[i].clone());
         return newc;
+    },
+
+    king_pos : function(team)
+    {
+        for (var i = 0; i < this.pieces.length; i++)
+            if (this.pieces[i].team == team)
+                if (this.pieces[i].type == Piece.TYPES.KING)
+                    return this.index.indexOf(i);
     }
 }
 
@@ -794,9 +806,8 @@ Piece.prototype =
 {
     clone : function()
     {
-        var newp = new Piece(this.position, this.flip, this.team);
-        newp.alive = this.alive;
-        return newp;
+        console.log("Piece.prototype.clone: virtual function");
+        return null;
     },
 
     // Empty methods: must be implemented in child
@@ -1140,6 +1151,7 @@ Piece.selected = -1;
 function Pawn(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.type = Piece.TYPES.PAWN;
     this.start = 1;
 }
 
@@ -1161,6 +1173,13 @@ Pawn.INIT_CONSTANTS = function ()
 /* Pawn methods */
 Pawn.prototype = Object.create(Piece.prototype,
 {
+    clone : { value : function()
+    {
+        var newp = new Pawn(this.position, this.flip, this.team);
+        newp.alive = this.alive;
+        return newp;
+    }},
+
     vertices : { value : function() { return Pawn.VERTICES; } },
     normals : { value : function() { return Pawn.NORMALS; } },
     colors : { value : function(i) { return Pawn.COLORS[i]; } },
@@ -1210,6 +1229,10 @@ Pawn.prototype = Object.create(Piece.prototype,
                 moves.push(fr);
         }
 
+        var i;
+        while ((i = moves.indexOf(-1)) !== -1)
+            moves.splice(i, 1);
+
         return moves;
     }}
 });
@@ -1219,6 +1242,7 @@ Pawn.prototype = Object.create(Piece.prototype,
 function Rook(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.type = Piece.TYPES.ROOK;
     this.start = 1;
 }
 
@@ -1238,6 +1262,13 @@ Rook.INIT_CONSTANTS = function ()
 // You can only castle with rook (not king)
 Rook.prototype = Object.create(Piece.prototype,
 {
+    clone : { value : function()
+    {
+        var newp = new Rook(this.position, this.flip, this.team);
+        newp.alive = this.alive;
+        return newp;
+    }},
+
     vertices : { value : function() { return Rook.VERTICES; } },
     normals : { value : function() { return Rook.NORMALS; } },
     colors : { value : function(i) { return Rook.COLORS[i]; } },
@@ -1248,6 +1279,10 @@ Rook.prototype = Object.create(Piece.prototype,
 
         // check all horizontal moves
         this.horizontal(t1, moves, config);
+  
+        var i;
+        while ((i = moves.indexOf(-1)) !== -1)
+            moves.splice(i, 1);
 
         return moves;
     }}
@@ -1258,6 +1293,7 @@ Rook.prototype = Object.create(Piece.prototype,
 function Knight(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.type = Piece.TYPES.KNIGHT;
 }
 
 /* Knight constants */
@@ -1275,6 +1311,13 @@ Knight.INIT_CONSTANTS = function ()
 /* Knight methods */
 Knight.prototype = Object.create(Piece.prototype,
 {
+    clone : { value : function()
+    {
+        var newp = new Knight(this.position, this.flip, this.team);
+        newp.alive = this.alive;
+        return newp;
+    }},
+
     vertices : { value : function() { return Knight.VERTICES; } },
     normals : { value : function() { return Knight.NORMALS; } },
     colors : { value : function(i) { return Knight.COLORS[i]; } },
@@ -1295,9 +1338,13 @@ Knight.prototype = Object.create(Piece.prototype,
         moves.push(this.r(this.r(this.d(t1))));
         moves.push(this.d(this.d(this.r(t1))));
 
-        for (var i = 0; i < moves.length; i++)
+        var i;
+        for (i = 0; i < moves.length; i++)
             if (config.teams[moves[i]] == this.team) 
                 moves[i] = -1;
+
+        while ((i = moves.indexOf(-1)) !== -1)
+            moves.splice(i, 1);
 
         return moves;
     }}
@@ -1308,6 +1355,7 @@ Knight.prototype = Object.create(Piece.prototype,
 function Bishop(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.type = Piece.TYPES.BISHOP;
 }
 
 /* Bishop constants */
@@ -1325,6 +1373,13 @@ Bishop.INIT_CONSTANTS = function ()
 /* Bishop methods */
 Bishop.prototype = Object.create(Piece.prototype,
 {
+    clone : { value : function()
+    {
+        var newp = new Bishop(this.position, this.flip, this.team);
+        newp.alive = this.alive;
+        return newp;
+    }},
+
     vertices : { value : function() { return Bishop.VERTICES; } },
     normals : { value : function() { return Bishop.NORMALS; } },
     colors : { value : function(i) { return Bishop.COLORS[i]; } },
@@ -1336,6 +1391,10 @@ Bishop.prototype = Object.create(Piece.prototype,
         // check all diagonal moves
         this.diagonal(t1, moves, config);
 
+        var i;
+        while ((i = moves.indexOf(-1)) !== -1)
+            moves.splice(i, 1);
+
         return moves;
     }}
 });
@@ -1344,6 +1403,7 @@ Bishop.prototype = Object.create(Piece.prototype,
 function Queen(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.type = Piece.TYPES.QUEEN;
 }
 
 /* Queen constants */
@@ -1361,6 +1421,13 @@ Queen.INIT_CONSTANTS = function ()
 /* Queen methods */
 Queen.prototype = Object.create(Piece.prototype,
 {
+    clone : { value : function()
+    {
+        var newp = new Queen(this.position, this.flip, this.team);
+        newp.alive = this.alive;
+        return newp;
+    }},
+
     vertices : { value : function() { return Queen.VERTICES; } },
     normals : { value : function() { return Queen.NORMALS; } },
     colors : { value : function(i) { return Queen.COLORS[i]; } },
@@ -1374,6 +1441,10 @@ Queen.prototype = Object.create(Piece.prototype,
         this.horizontal(t1, moves, config);
         this.diagonal(t1, moves, config);
 
+        var i;
+        while ((i = moves.indexOf(-1)) !== -1)
+            moves.splice(i, 1);
+
         return moves;
     }}
 });
@@ -1382,6 +1453,7 @@ Queen.prototype = Object.create(Piece.prototype,
 function King(position, flip, team)
 {
     Piece.call(this, position, flip, team)
+    this.type = Piece.TYPES.KING;
     this.start = 1;
 }
 
@@ -1400,6 +1472,13 @@ King.INIT_CONSTANTS = function ()
 /* King methods */
 King.prototype = Object.create(Piece.prototype,
 {
+    clone : { value : function()
+    {
+        var newp = new King(this.position, this.flip, this.team);
+        newp.alive = this.alive;
+        return newp;
+    }},
+
     vertices : { value : function() { return King.VERTICES; } },
     normals : { value : function() { return King.NORMALS; } },
     colors : { value : function(i) { return King.COLORS[i]; } },
@@ -1418,12 +1497,16 @@ King.prototype = Object.create(Piece.prototype,
         moves.push(this.l(t1));
         moves.push(this.ul(t1));
 
-        for (var i = 0; i < moves.length; i++)
+        var i;
+        for (i = 0; i < moves.length; i++)
         {
             var m = config.teams[moves[i]];
             if (m == this.team || m == -1) 
                 moves[i] = -1;
         }
+
+        while ((i = moves.indexOf(-1)) !== -1)
+            moves.splice(i, 1);
 
         return moves;
     }}
