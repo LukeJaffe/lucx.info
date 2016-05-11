@@ -38,6 +38,7 @@ View.prototype =
 
         // apply the view matrix to the model matrix
         mat4.multiply(this.world.mv, this.world.mv, this.camera.vm());
+        mat4.translate(this.world.mv, this.world.mv, [-8,-8,0]);
 
         // draw the board
         this.world.push_mv();

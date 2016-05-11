@@ -2,32 +2,11 @@
 
 <head>
 
-<script src="jquery-1.11.3.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/utils/jquery-1.11.3.min.js"></script>
+<link rel="stylesheet" type="text/css" href="/catan/pp_lobby.css">
 
 <style>
-
-table, th, td {
-    border: 1px solid black;
-}
-
-h1
-{
-    color: black;
-    text-align: center;
-    font-family: "Calibri";
-    font-size: xx-large;
-}
-
-h2
-{
-    position: fixed;
-    top: 250px;
-    left: 50px;
-    color: red;
-    text-align: center;
-    font-family: "Calibri";
-    font-size: large;
-}
 
 Red {background-color: red;}
 Blue {background-color: blue;}
@@ -39,21 +18,109 @@ White {background-color: white;}
 
 <body>
 
+<ul class="horizontal-list">
+  <li><a href="/home/index.html">Home</a></li>
+  <li><a href="/home/games.html">Games</a></li>
+  <li><a href="/home/register.html">Register</a></li>
+  <li><a href="/home/login.html">Login</a></li>
+  <li style="float: right;"><a href="/logout">Logout</a></li>
+  <h3></h3>
+</ul>
+
 <h1>Game Setup</h1>
 
-<table id="setup_table" border="1" cellpadding="5" cellspacing="5">
+<table id="setup_table" class="table">
+    <tr>
+        <th>Player</th>
+        <th>Color</th>
+    </tr>
 </table>
 
-<button id="start_button">Start Game</button>
+<button id="start_button" class="button">Start Game</button>
 
 <h2></h2>
 
 <script>
 
-/* Disable the start game button */
+var socket = io.connect();
+var username = "GUEST";
+
+/* Get username from session data */
+$.post( "http://lucx.info/session", function(response)
+{
+    $("h3").html("Welcome: "+response);
+    username = response;
+    get_users();
+});
+
+// Disable the start game button
 $("#start_button").prop("disabled", true);
 
-/* Redirect to game page if game is started (every 1s)*/
+// Populate table with users in game
+function get_users()
+{
+    socket.emit('get_users', {username: username});
+}
+
+socket.on('user_data', function(data)
+{
+    var table = document.getElementById("setup_table");
+
+    // Get available colors 
+    var colors = ["Red", "Blue", "Orange", "White"];
+    /*
+    for (var i = 0; i < result.length-1; i++)
+    {
+        colors = $.grep(colors, function(value)
+        {
+            return value != result[i][1];
+        });
+    }
+    */
+
+    // Draw html elements 
+    for (var i = 0; i < data.users.length; i++)
+    {
+        var row = table.insertRow(1);
+        var cell1 = row.insertCell(0);
+        var cell2 = row.insertCell(1);
+        cell1.innerHTML = "<td>"+data.users[i].username+"</td>";
+
+        var str = 
+        "<select id='color_select' class='menu'>"+
+            "<option value='None'>None</option>";
+        for (var j = 0; j < colors.length; j++)
+            str += 
+            "<option value='"+colors[j]+"'>"+colors[j]+"</option>";
+        str += 
+        "</select>";
+        cell2.innerHTML = str;
+        // Color index changed 
+        /*
+        $('#color_select').change( function()
+        {
+            var option = $(this).find('option:selected').val();
+            $.post("http://lucx.info/catan/select_color.php",
+            {color: option},
+            function(response)
+            {
+                if (response == 0)
+                    location.reload();
+                else
+                    $("h2").html(response);
+            });
+        });
+        else
+        {
+            var c = result[i][1];
+            cell2.innerHTML = "<"+c+">_____</"+c+">";
+        }
+        */
+    }
+});
+
+/*
+//Redirect to game page if game is started (every 1s)
 function goto_game()
 {
     $.post("http://lucx.info/catan/check_started.php",
@@ -73,11 +140,11 @@ function goto_game()
 
 setInterval(goto_game, 1000);
 
-/* Fetch entries from mysql */
+// Fetch entries from mysql 
 $.post("http://lucx.info/catan/get_players.php",
 function(response)
 {
-    /* Add column titles to table */
+    // Add column titles to table 
     var table = document.getElementById("setup_table");
     var row = table.insertRow(0);
     var cell1 = row.insertCell(0);
@@ -85,10 +152,10 @@ function(response)
     cell1.innerHTML = "<th><b>Player</b></th>";
     cell2.innerHTML = "<th><b>Color</b></th>";
 
-    /* Parse response */
+    // Parse response 
     var result = $.parseJSON(response);
 
-    /* Get available colors */
+    // Get available colors 
     var colors = ["Red", "Blue", "Orange", "White"];
     for (var i = 0; i < result.length-1; i++)
     {
@@ -98,7 +165,7 @@ function(response)
         });
     }
 
-    /* Draw html elements */
+    // Draw html elements 
     for (var i = 0; i < result.length-1; i++)
     {
         var row = table.insertRow(1);
@@ -117,7 +184,7 @@ function(response)
             str += 
             "</select>";
             cell2.innerHTML = str;
-            /* Color index changed */
+            // Color index changed 
             $('#color_select').change( function()
             {
                 var option = $(this).find('option:selected').val();
@@ -140,7 +207,7 @@ function(response)
     }
 });
 
-/* Check if game is full */
+// Check if game is full 
 var full = false;
 $.post("http://lucx.info/catan/check_full.php",
 function(response)
@@ -153,7 +220,7 @@ function(response)
         $("h2").html(response);
 });
 
-/* Enable start button if host and full */
+// Enable start button if host and full 
 $.post("http://lucx.info/catan/check_host.php",
 function(response)
 {
@@ -161,7 +228,7 @@ function(response)
         $("#start_button").prop("disabled", false);
 });
 
-/* Start button starts game */
+// Start button starts game 
 $("#start_button").click(function()
 {
     $.post("http://lucx.info/catan/start_game.php",
@@ -170,6 +237,7 @@ $("#start_button").click(function()
     });
     window.location.href = "http://lucx.info/catan/game.html";
 });
+*/
 
 </script>
 

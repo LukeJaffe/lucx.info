@@ -60,12 +60,15 @@
         this.shader = new Shader(this.gl);
         this.view = new View(this.gl, this.shader);
 
-        this.mouse_down = false;
-        this.last_mouse_x = null;
-        this.last_mouse_y = null;
 
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
         this.gl.enable(this.gl.DEPTH_TEST);
+
+        // mouse stuff
+        this.last_mouse_x = null;
+        this.last_mouse_y = null;
+        this.out_mouse_down = false;
+        this.in_mouse_down = false;
 
         // keyboard variables
         this.shift_down = false;
@@ -74,8 +77,9 @@
         this.cam_moving = false;
         this.num_inc = 0;
         this.num_steps = 100;
-        this.t_start = 25;
-        this.t_inc = 0;
+        this.t_start = [0, 0, 25];
+        this.t_zoom = [0, 0, 4];
+        this.t_inc = vec3.create();
     }
 
     Game.prototype.clear = function()
@@ -93,7 +97,7 @@
             mat4.add(this.view.camera.rm, this.view.camera.rm, this.cam_inc);
             
             // update camera z position
-            this.view.camera.tv[2] += this.t_inc;
+            vec3.add(this.view.camera.tv, this.view.camera.tv, this.t_inc);
 
             // increment until reach start position
             this.num_inc++;
@@ -137,16 +141,38 @@
 
     Game.prototype.handle_mouse_down = function(event) 
     {
-        this.mouse_down = true;
         this.last_mouse_x = event.clientX;
         this.last_mouse_y = event.clientY;
 
         // check to see if any goldbergs are selected
         var selected = this.view.world.goldberg.selected;
-        if (selected !== -1)
+        if (selected !== -1 && !this.cam_moving)
         {
             console.log("Selected: "+selected);
-            // zoom in!
+            // zoom in to a goldberg
+            this.zoom = true;
+
+            // start moving camera
+            this.cam_moving = true;
+
+            // get target position
+            var pt = mat4.create();
+            mat4.identity(pt);
+            this.view.world.goldberg.set_mv(selected, pt);
+
+            // get diff between current rotation mat and id
+            var diff = mat4.create();
+            mat4.subtract(diff, pt, this.view.camera.rm);
+
+            // get inc mat by dividing by num steps
+            for (var i = 0; i < 16; i++)
+                diff[i] = diff[i]/this.num_steps;
+            this.cam_inc = diff;
+
+            // get diff between current cam position and default position
+            var tdiff = vec3.create();
+            vec3.subtract(tdiff, this.t_zoom, this.view.camera.tv);
+            vec3.scale(this.t_inc, tdiff, 1.0/this.num_steps);
         }
         else
         {
@@ -183,8 +209,17 @@
         }
 
         // if the shift key is being held, check for collisions
+        // with bounding spheres
         if (this.shift_down)
-            this.view.collision(new_x, new_y);
+        {
+                this.view.sphere_collision(new_x, new_y);
+        }
+
+        // if we are in zoom mode, check for goldberg face collisions
+        if (this.zoom)
+        {
+            this.view.face_collision(new_x, new_y)
+        }
 
         this.last_mouse_x = new_x;
         this.last_mouse_y = new_y;
@@ -206,11 +241,17 @@
         }
         if (event.keyCode == 32 && !this.cam_moving)
         {
+            // back to zoomed out mode
+            this.zoom = false;
+
+            // camera starts moving
             this.cam_moving = true;
 
             // get start position
             var id = mat4.create();
             mat4.identity(id);
+
+            mat4.multiply(this.view.camera.rm, this.view.camera.rm, id);
 
             // get diff between current rotation mat and id
             var diff = mat4.create();
@@ -219,12 +260,12 @@
             // get inc mat by dividing by num steps
             for (var i = 0; i < 16; i++)
                 diff[i] = diff[i]/this.num_steps;
+            this.cam_inc = diff;
 
             // get diff between current cam position and default position
-            var tdiff = this.t_start - this.view.camera.tv[2];
-            this.t_inc = tdiff/this.num_steps;
-            
-            this.cam_inc = diff;
+            var tdiff = vec3.create();
+            vec3.subtract(tdiff, this.t_start, this.view.camera.tv);
+            vec3.scale(this.t_inc, tdiff, 1.0/this.num_steps);
         }
     }
 
@@ -265,7 +306,7 @@
         this.gl.uniformMatrix4fv(this.shader.program.mvMatrixUniform, false, this.world.mv);
     }
 
-    View.prototype.collision = function(x, y)
+    View.prototype.sphere_collision = function(x, y)
     {
         // update cursor
         this.cursor.update(x, y, this.camera.p);
@@ -295,6 +336,11 @@
             else
                 this.world.goldberg.color[i] = 1;
         }
+    }
+
+    View.prototype.face_collision = function(x, y)
+    {
+
     }
 
     View.prototype.clear_selected = function()
@@ -379,6 +425,7 @@
         // rotation matrix
         this.rm = mat4.create();
         mat4.identity(this.rm);
+        mat4.rotate(this.rm, this.rm, degToRad(45), [0, 1, 0]);
 
         // translation vector
         this.tv = [0, 0, 25];

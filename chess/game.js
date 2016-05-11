@@ -166,8 +166,11 @@ Game.prototype.handle_mouse_move = function(event)
         var rm_new = mat4.create();
         mat4.identity(rm_new);
 
-        mat4.rotate(rm_new, rm_new, degToRad(dx / 5), [0, 1, 0]);
-        mat4.rotate(rm_new, rm_new, degToRad(dy / 5), [1, 0, 0]);
+
+        //mat4.rotate(rm_new, rm_new, degToRad(dx / 5), [0, 1, 0]);
+        //
+        mat4.rotate(rm_new, rm_new, degToRad(dx / 5), [0, 0, 1]);
+        //mat4.rotate(rm_new, rm_new, degToRad(dy / 5), [1, 0, 0]);
 
         mat4.invert(rm_new, rm_new);
 

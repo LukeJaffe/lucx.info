@@ -14,10 +14,11 @@ function Camera(gl)
     // rotation matrix
     this.rm = mat4.create();
     mat4.identity(this.rm);
-    mat4.rotate(this.rm, this.rm, degToRad(45), [1, 0, 0]); 
+    //mat4.rotate(this.rm, this.rm, degToRad(45), [1, 0, 0]); 
 
     // translation vector
-    this.tv = [7, 4, 30];
+    //this.tv = [7, 4, 30];
+    this.tv = [0, 0, 30];
 }
 
 Camera.prototype.vm = function()

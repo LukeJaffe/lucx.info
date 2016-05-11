@@ -4,9 +4,11 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/utils/jquery-1.11.3.min.js"></script>
+<link rel="stylesheet" type="text/css" href="/catan/pp_lobby.css">
 
 <style>
 
+/*
 h1
 {
     color: black;
@@ -25,25 +27,44 @@ h2
     font-family: "Calibri";
     font-size: large;
 }
+*/
 
 </style>
 </head>
 
 <body>
 
+<ul class="horizontal-list">
+  <li><a href="/home/index.html">Home</a></li>
+  <li><a href="/home/games.html">Games</a></li>
+  <li><a href="/home/register.html">Register</a></li>
+  <li><a href="/home/login.html">Login</a></li>
+  <li style="float: right;"><a href="/logout">Logout</a></li>
+  <h3></h3>
+</ul>
+
 <h1>Catan Lobby</h1>
 
-<table id="game_table" border="1" cellpadding="5" cellspacing="5">
+<table id="game_table" class="table">
     <tr>
-        <td><input type="submit" id="new_button" value="New"></a></td>
+        <th>Game</th>
+        <th>Host</th>
+        <th>Num Players</th>
+        <th>Max Players</th>
+        <th>Join</th>
+    </tr>
+    <tr>      
+        <td><input type="submit" id="new_button" class="button" value="New"></a></td>
         <td></td>
         <td>
-            <select id="player_select">
+            <select id="player_select" class="menu" name="player_select">
                 <option value="2">2</option>
                 <option value="3">3</option>
                 <option value="4">4</option>
             </select>
         </td>
+        <td></td>
+        <td></td>
     </tr>
 </table>
 
@@ -57,23 +78,11 @@ var username = "GUEST";
 /* Get username from session data */
 $.post( "http://lucx.info/session", function(response)
 {
+    $("h3").html("Welcome: "+response);
     username = response;
 });
 
-setup_table();
 get_games();
-
-function setup_table()
-{
-    var table = document.getElementById("game_table");
-    var row = table.insertRow(0);
-    var cell1 = row.insertCell(0);
-    var cell2 = row.insertCell(1);
-    var cell3 = row.insertCell(2);
-    cell1.innerHTML = "<th><b>Game</b></th>";
-    cell2.innerHTML = "<th><b>Host</b></th>";
-    cell3.innerHTML = "<th><b>Players</b></th>";
-}
 
 function get_games()
 {
@@ -99,9 +108,16 @@ socket.on('game_data', function(data)
         var cell1 = row.insertCell(0);
         var cell2 = row.insertCell(1);
         var cell3 = row.insertCell(2);
-        cell1.innerHTML = "<td><a href='javascript:void(0);' onclick='join_game(\""+games[i].id+"\");'>"+"Game "+games[i].id+"</a></td>";
+        var cell4 = row.insertCell(3);
+        var cell5 = row.insertCell(4);
+        cell1.innerHTML = "<td>Game "+games[i].id+"</td>";
         cell2.innerHTML = "<td>"+games[i].host+"</td>";
-        cell3.innerHTML = "<td>"+games[i].max_players+"</td>";
+        cell3.innerHTML = "<td>"+games[i].num_players+"</td>";
+        cell4.innerHTML = "<td>"+games[i].max_players+"</td>";
+        if (games[i].num_players >= games[i].max_players)
+            cell5.innerHTML = "<td><input type='submit' class='button' id='join_button'+games[i].id value='Join' onclick='join_game(\""+games[i].id+"\");' disabled></a></td>";
+        else
+            cell5.innerHTML = "<td><input type='submit' class='button' id='join_button'+games[i].id value='Join' onclick='join_game(\""+games[i].id+"\");'></a></td>";
     }
 });
 
@@ -115,7 +131,7 @@ $('#new_button').click(function()
     }
     else
     {
-        console.log("Login to create game");
+        $("h2").html("Login to create game.");
     }
 });
 
@@ -124,33 +140,37 @@ socket.on('new_game_success', function()
     get_games();
 });
 
-socket.on('new_game_failure', function()
+socket.on('new_game_failure', function(data)
 {
-    $("h2").html("This host has already created a game.");
+    $("h2").html(data.msg);
 });
 
+// Javascript function to join game
 function join_game(id)
 {
-    console.log("Joining game: "+id);
+    if (username != "GUEST")
+    {
+        socket.emit('join_game', {'id': id, 'username': username});
+        console.log("Joining game: "+id);
+    }
+    else
+    {
+        $("h2").html("Login to join game.");
+    }
 }
 
-// Javascript function to join game
-/*
-function join_game(game)
+socket.on('join_game_success', function()
 {
-    $.post("http://lucx.info/catan/join_game.php", {game: game}, function(response)
-    {
-        if (response == 0 || response == 1)
-            window.location.href = "http://lucx.info/catan/setup.html";
-        else
-            $("h2").html(response);
-    });
-}
-*/
+    window.location.href = "http://lucx.info/catan/setup.html";
+});
+
+socket.on('join_game_failure', function(data)
+{
+    $("h2").html(data.msg);
+});
 
 </script>
 
 </body>
 
 <html>
-

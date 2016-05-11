@@ -399,6 +399,46 @@ app.get('/chess/verts.js', function (req, res)
     res.sendFile( __dirname + "/chess/" + "verts.js" );
 });
 
+app.get('/chess/utils.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "utils.js" );
+});
+
+app.get('/chess/game.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "game.js" );
+});
+
+app.get('/chess/view.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "view.js" );
+});
+
+app.get('/chess/config.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "config.js" );
+});
+
+app.get('/chess/world.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "world.js" );
+});
+
+app.get('/chess/camera.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "camera.js" );
+});
+
+app.get('/chess/board.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "board.js" );
+});
+
+app.get('/chess/piece.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/chess/" + "piece.js" );
+});
+
 app.get('/chess/shader.js', function (req, res) 
 {
     res.sendFile( __dirname + "/chess/" + "shader.js" );
@@ -417,6 +457,32 @@ app.get('/chess/webgl-utils.js', function (req, res)
 app.get('/chess/gl-matrix.js', function (req, res) 
 {
     res.sendFile( __dirname + "/chess/" + "gl-matrix.js" );
+});
+
+
+/**************
+ * Lighting Demo
+ * *************/
+
+/* GET requests */
+app.get('/lighting/index.html', function (req, res) 
+{
+    res.sendFile( __dirname + "/lighting/" + "index.html" );
+});
+
+app.get('/lighting/webgl-utils.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/lighting/" + "webgl-utils.js" );
+});
+
+app.get('/lighting/glMatrix-0.9.5.min.js', function (req, res) 
+{
+    res.sendFile( __dirname + "/lighting/" + "glMatrix-0.9.5.min.js" );
+});
+
+app.get('/lighting/crate.gif', function (req, res) 
+{
+    res.sendFile( __dirname + "/lighting/" + "crate.gif" );
 });
 
 
